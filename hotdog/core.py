@@ -33,9 +33,10 @@ class ProcessorConfig:
     tc_path: str = "/c/TOPAS/tc.exe"
     inp_path: str = "./template.inp"
     wd_path: str = "./"
-    xy_file_fmt: str = "{sample}_{time:%Y%m%d-%H%M}_{motor_x}_{x}_{x_unit}_{motor_y}_{y}_{y_unit}_{short_uid}_{" \
-                       "seq_num}_{data_type}.xy"
+    xy_file_fmt: str = "{sample}_{time}_{motor_x}_{x_name}_{x}_{x_unit}_{motor_y}_{y_name}_{" \
+                       "y_unit}_{short_uid}_{seq_num}_{data_type}.xy"
     data_keys: typing.Tuple = frozenset(["x", "y"])
+    metadata: dict = None
     n_scan: int = 1
     n_thread: int = 4
 
@@ -98,14 +99,13 @@ class Processor(LiveDispatcher):
         # count
         self.count += 1
         # process file
-        data, meta = self.parse_filename(filename)
+        raw_data, raw_meta = self.parse_filename(filename)
         fr = self.run_topas(filename)
-        data.update(dcs.asdict(fr))
         cr = self.run_calib(fr)
-        data.update(dcs.asdict(cr))
+        data = dict(**raw_data, **dcs.asdict(fr), **dcs.asdict(cr))
         # emit start if this is the first file
         if self.count == 1:
-            self.emit_start(meta)
+            self.emit_start(raw_meta)
             self.emit_descriptor()
         # emit event data
         self.process_event({"data": data, "descriptor": self.desc_uid})
@@ -166,9 +166,14 @@ class Processor(LiveDispatcher):
         pass
 
     def emit_start(self, meta: dict) -> str:
+        user_meta = self.config.metadata
+        dks = self.config.data_keys
+        if user_meta is None:
+            user_meta = {}
         uid = bus.new_uid()
-        doc = {"uid": uid}
-        doc.update(meta)
+        doc = dict(**meta, **user_meta)
+        doc["uid"] = uid
+        doc["hints"] = {'dimensions': [([dk], 'primary') for dk in dks]}
         self.start(doc)
         return uid
 
