@@ -1,0 +1,45 @@
+
+r_exp 18.80371332 r_exp_dash 32.65252888 r_wp 2.968131082 r_wp_dash 5.154140792 r_p 2.281218015 r_p_dash 5.336032943 weighted_Durbin_Watson 0.006710439537 gof 0.1578481351
+iters 100000
+do_errors
+xdd "{xy_file}"
+	r_exp 18.80371332 r_exp_dash 32.65252888 r_wp 2.968131082 r_wp_dash 5.154140792 r_p 2.281218015 r_p_dash 5.336032943 weighted_Durbin_Watson 0.006710439537 gof 0.1578481351
+	x_calculation_step 0.000764
+	bkg @ 17.6830783 -7.468990733 3.802896906 -4.544634697 3.162787072 -0.1698535003 0.6962715313 -0.5196764379 -0.2303457493
+	start_X  2.6
+	finish_X  10
+	Rp 217.5
+	Rs 217.5
+	lam
+		ymin_on_ymax  0.001
+		la  1 lo  0.1668 lh  1e-011 lo_ref
+	str
+		e0_from_Strain( 0.0006912888019,@, 0.3168634462,,)
+		PV_Peak_Type(, 0.01121,, 0.05733,, 0.01119,, 0.22961,, 1.46146,, 0.0585)
+		r_bragg  0
+		phase_MAC 0
+		phase_name "corundum"
+		MVW( 0, 255.1, 0)
+		space_group R-3c
+		scale @ 1.725322879e-006
+		Phase_LAC_1_on_cm( 0)
+		Phase_Density_g_on_cm3( 0)
+		Trigonal(@ 4.761943731,@ 13.00087923)
+		site O num_posns 0 x @ 0.3069 y  0 z  0.25 occ O  1 beq @ 1
+		site Al num_posns 0 x  0 y  0 z @ 0.14777 occ Al  1 beq @ 1
+
+		local AlBragg = Get(r_bragg) ;: 0
+		prm Vol_Rod = Get(cell_volume) ;:  176.87166`_0.00914
+
+out "{res_file}"
+	Out(Get(r_wp), "%11.10f\n")
+	Out(Vol_Rod, "%11.10f\n")
+	'Out(LatLiCl, "%11.10f\n")
+
+xdd_out "{fit_file}"
+     {
+         "%11.6f," = X;
+         "%11.6f," = Yobs;
+         "%11.6f," = Ycalc;
+         " %11.6f\n" = Yobs-Ycalc;
+     }
