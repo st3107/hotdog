@@ -30,6 +30,11 @@ class ObserverConfig:
 @dataclass
 class ProcessorConfig:
 
+    VT0_path: typing.Union[None, str] = None
+    c1: float = 1.
+    c2: float = 1.
+    V_col: str = "Vol"
+    T_col: str = "T"
     tc_path: str = "/c/TOPAS/tc.exe"
     inp_path: str = "./template.inp"
     wd_path: str = "./"
@@ -39,7 +44,6 @@ class ProcessorConfig:
     metadata: dict = None
     n_scan: int = 1
     n_thread: int = 4
-
 
 @dataclass
 class FitResult:
@@ -55,7 +59,7 @@ class FitResult:
 @dataclass
 class CalibResult:
 
-    temperature: float
+    T: float
 
 
 @dataclass
@@ -81,6 +85,8 @@ class Processor(LiveDispatcher):
     def __init__(self, config: ProcessorConfig):
         super(Processor, self).__init__()
         self.config = config
+        vt0_path = self.config.VT0_path
+        self.vt0_df: pd.DataFrame = pd.read_csv(vt0_path) if vt0_path is not None else pd.DataFrame()
         self.inp_template = pathlib.Path(self.config.inp_path).read_text()
         self.working_dir = pathlib.Path(self.config.wd_path)
         self.desc_uid = ""
@@ -101,7 +107,7 @@ class Processor(LiveDispatcher):
         # process file
         raw_data, raw_meta = self.parse_filename(filename)
         fr = self.run_topas(filename)
-        cr = self.run_calib(fr)
+        cr = self.run_calib(fr) if not self.vt0_df.empty else {}
         data = dict(**raw_data, **dcs.asdict(fr), **dcs.asdict(cr))
         # emit start if this is the first file
         if self.count == 1:
@@ -162,8 +168,13 @@ class Processor(LiveDispatcher):
         return FitResult(Rwp=res[0], Vol=res[1], tth=fit[0], I=fit[1], Icalc=fit[2], Idiff=fit[3])
 
     def run_calib(self, fitresult: FitResult) -> CalibResult:
-        #TODO: fill in
-        pass
+        v = fitresult.Vol
+        c1 = self.config.c1
+        c2 = self.config.c2
+        v0 = self.vt0_df[self.config.V_col][self.count - 1]
+        t0 = self.vt0_df[self.config.T_col][self.count - 1]
+        _, T = np.roots([c2, c1, v0 - c2 * t0 ** 2 - c1 * t0 - v])
+        return CalibResult(T=T)
 
     def emit_start(self, meta: dict) -> str:
         user_meta = self.config.metadata
