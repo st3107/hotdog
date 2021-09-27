@@ -31,19 +31,19 @@ class ObserverConfig:
 class ProcessorConfig:
 
     VT0_path: typing.Union[None, str] = None
-    c1: float = 1.
-    c2: float = 1.
-    V_col: str = "Vol"
-    T_col: str = "T"
-    tc_path: str = "/c/TOPAS/tc.exe"
-    inp_path: str = "./template.inp"
-    wd_path: str = "./"
-    xy_file_fmt: str = "{sample}_{time}_{motor_x}_{x_name}_{x}_{x_unit}_{motor_y}_{y_name}_{" \
-                       "y_unit}_{short_uid}_{seq_num}_{data_type}.xy"
-    data_keys: typing.Tuple = frozenset(["x", "y"])
+    c1: float = 0.
+    c2: float = 0.
+    V_col: str = ""
+    T_col: str = ""
+    tc_path: str = ""
+    inp_path: str = ""
+    wd_path: str = ""
+    xy_file_fmt: str = ""
+    data_keys: typing.Tuple = tuple()
     metadata: dict = None
     n_scan: int = 1
-    n_thread: int = 4
+    n_thread: int = 1
+
 
 @dataclass
 class FitResult:
