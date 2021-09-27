@@ -30,11 +30,12 @@ class ObserverConfig:
 @dataclass
 class ProcessorConfig:
 
-    VT0_path: typing.Union[None, str] = None
+    V0_path: typing.Union[None, str] = None
+    V0_col: str = "Vol"
+    V0: float = 1.
+    T0: float = 298.15
     c1: float = 0.
     c2: float = 0.
-    V_col: str = "Vol"
-    T_col: str = "T"
     tc_path: str = ""
     inp_path: str = ""
     xy_file: str = "xy_file"
@@ -43,7 +44,7 @@ class ProcessorConfig:
     wd_path: str = ""
     xy_file_fmt: str = ""
     data_keys: typing.Tuple = tuple()
-    metadata: dict = None
+    metadata: typing.Union[None, dict] = None
     n_scan: int = 1
     n_thread: int = 1
 
@@ -88,8 +89,11 @@ class Processor(LiveDispatcher):
     def __init__(self, config: ProcessorConfig):
         super(Processor, self).__init__()
         self.config = config
-        vt0_path = self.config.VT0_path
-        self.vt0_df: pd.DataFrame = pd.read_csv(vt0_path) if vt0_path is not None else pd.DataFrame()
+        v0_path = self.config.V0_path
+        if v0_path is not None:
+            self.v0_df = pd.read_csv(v0_path)
+        else:
+            self.v0_df = pd.DataFrame({self.config.V0_col: [self.config.V0] * self.config.n_scan})
         self.inp_template = pathlib.Path(self.config.inp_path).read_text()
         self.working_dir = pathlib.Path(self.config.wd_path)
         self.desc_uid = ""
@@ -110,7 +114,7 @@ class Processor(LiveDispatcher):
         # process file
         raw_data, raw_meta = self.parse_filename(filename)
         fr = self.run_topas(filename)
-        cr = self.run_calib(fr) if not self.vt0_df.empty else {}
+        cr = self.run_calib(fr)
         data = dict(**raw_data, **dcs.asdict(fr), **dcs.asdict(cr))
         # emit start if this is the first file
         if self.count == 1:
@@ -177,8 +181,8 @@ class Processor(LiveDispatcher):
         v = fitresult.Vol
         c1 = self.config.c1
         c2 = self.config.c2
-        v0 = self.vt0_df[self.config.V_col][self.count - 1]
-        t0 = self.vt0_df[self.config.T_col][self.count - 1]
+        v0 = self.vt0_df[self.config.V0_col][self.count - 1]
+        t0 = self.config.T0
         _, T = np.roots([c2, c1, v0 - c2 * t0 ** 2 - c1 * t0 - v])
         return CalibResult(T=T)
 
