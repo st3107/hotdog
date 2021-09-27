@@ -33,10 +33,13 @@ class ProcessorConfig:
     VT0_path: typing.Union[None, str] = None
     c1: float = 0.
     c2: float = 0.
-    V_col: str = ""
-    T_col: str = ""
+    V_col: str = "Vol"
+    T_col: str = "T"
     tc_path: str = ""
     inp_path: str = ""
+    xy_file: str = "xy_file"
+    res_file: str = "res_file"
+    fit_file: str = "fit_file"
     wd_path: str = ""
     xy_file_fmt: str = ""
     data_keys: typing.Tuple = tuple()
@@ -139,9 +142,12 @@ class Processor(LiveDispatcher):
         fit_file = out_fp.with_suffix(".fit")
         # write out the inp file
         inp_text = inp.format(
-            xy_file=str(xy_file),
-            res_file=str(res_file),
-            fit_file=str(fit_file),
+            **dict(
+                zip(
+                    [self.config.xy_file, self.config.res_file, self.config.fit_file],
+                    [str(xy_file), str(res_file), str(fit_file)]
+                )
+            )
         )
         if inp_file.is_file():
             raise ProcessorError("{} already exits.".format(str(inp_file)))
