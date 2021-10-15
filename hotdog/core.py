@@ -1,4 +1,5 @@
 import collections
+import dataclasses
 import pathlib
 import subprocess
 import typing
@@ -30,21 +31,21 @@ class ObserverConfig:
 @dataclass
 class ProcessorConfig:
 
-    V0_path: typing.Union[None, str] = None
-    V0_col: str = "Vol"
-    V0: float = 1.
-    T0: float = 298.15
-    c1: float = 0.
-    c2: float = 0.
-    tc_path: str = ""
-    inp_path: str = ""
+    mode: int = 0
+    T0: float = 0.
+    V0: float = 0.
+    prev_csv: str = None
+    coeffs: typing.Tuple = None
+    vol_correction: pd.DataFrame = None
+    tc_path: str = None
+    inp_path: str = None
     xy_file: str = "xy_file"
     res_file: str = "res_file"
     fit_file: str = "fit_file"
-    wd_path: str = ""
-    xy_file_fmt: str = ""
-    data_keys: typing.Tuple = tuple()
-    metadata: typing.Union[None, dict] = None
+    wd_path: str = None
+    xy_file_fmt: str = None
+    data_keys: typing.Tuple = None
+    metadata: typing.Dict[str, float] = None
     n_scan: int = 1
     n_thread: int = 1
 
@@ -63,6 +64,8 @@ class FitResult:
 @dataclass
 class CalibResult:
 
+    alpha: float
+    realVol: float
     T: float
 
 
@@ -89,15 +92,26 @@ class Processor(LiveDispatcher):
     def __init__(self, config: ProcessorConfig):
         super(Processor, self).__init__()
         self.config = config
-        v0_path = self.config.V0_path
-        if v0_path is not None:
-            self.v0_df = pd.read_csv(v0_path)
+        self.prev_df = None
+        if self.config.prev_csv is not None:
+            self.prev_df = pd.read_csv(self.config.prev_csv)
         else:
-            self.v0_df = pd.DataFrame({self.config.V0_col: [self.config.V0] * self.config.n_scan})
+            if self.config.mode == 1:
+                self.print(
+                    "WARNING: Missing the data from the previous run. "
+                    "The alpha will not be calculated."
+                )
+            elif self.config.mode == 2:
+                self.print(
+                    "WARNING: Missing the data from the previous run. "
+                    "The volume correction will be skipped. "
+                    "The T0 and V0 in configuration file will be used."
+                )
         self.inp_template = pathlib.Path(self.config.inp_path).read_text()
         self.working_dir = pathlib.Path(self.config.wd_path)
         self.desc_uid = ""
         self.count = 0
+        self.fields = tuple((f.name for f in dataclasses.fields(CalibResult)))
 
     def process_a_file(self, filename: str) -> None:
         """Process the XRD data file and output the documents of the results.
@@ -114,7 +128,7 @@ class Processor(LiveDispatcher):
         # process file
         raw_data, raw_meta = self.parse_filename(filename)
         fr = self.run_topas(filename)
-        cr = self.run_calib(fr)
+        cr = self.run_calib(fr, raw_data)
         data = dict(**raw_data, **dcs.asdict(fr), **dcs.asdict(cr))
         # emit start if this is the first file
         if self.count == 1:
@@ -177,14 +191,57 @@ class Processor(LiveDispatcher):
             raise ProcessorError("The {} is not four-column file.".format(str(fit_file)))
         return FitResult(Rwp=res[0], Vol=res[1], tth=fit[0], I=fit[1], Icalc=fit[2], Idiff=fit[3])
 
-    def run_calib(self, fitresult: FitResult) -> CalibResult:
-        v = fitresult.Vol
-        c1 = self.config.c1
-        c2 = self.config.c2
-        v0 = self.vt0_df[self.config.V0_col][self.count - 1]
-        t0 = self.config.T0
-        _, T = np.roots([c2, c1, v0 - c2 * t0 ** 2 - c1 * t0 - v])
-        return CalibResult(T=T)
+    def run_calib(self, fitresult: FitResult, raw_data: dict) -> CalibResult:
+        mode = self.config.mode
+        if mode == 0:
+            # Record the V0, T0
+            return self.run_calib_0(fitresult)
+        elif mode == 1:
+            # Calculate the correction parameter
+            return self.run_calib_1(fitresult)
+        elif mode == 2:
+            # Calculate the real volume and temperature
+            return self.run_calib_2(fitresult, raw_data)
+        else:
+            raise ValueError("Unknown mode: {}. Require mode in 0, 1, 2.".format(mode))
+
+    def run_calib_0(self, fitresult: FitResult) -> CalibResult:
+        return CalibResult(1., fitresult.Vol, self.config.T0)
+
+    def run_calib_1(self, fitresult: FitResult) -> CalibResult:
+        if self.prev_df is None:
+            realVol = fitresult.Vol
+            alpha = 1
+        else:
+            realVol = self.prev_df["realVol"][0]
+            alpha = realVol / fitresult.Vol
+        T = self.prev_df["T"][0]
+        return CalibResult(alpha, realVol, T)
+
+    def run_calib_2(self, fitresult: FitResult, raw_data: dict) -> CalibResult:
+        if self.prev_df is None:
+            cr0 = 1., self.config.T0, self.config.V0
+        else:
+            cr0 = self._get_prev_result(raw_data)
+        alpha = cr0.alpha
+        realVol = alpha * fitresult.Vol
+        T = np.max(np.roots((cr0.realVol - realVol,) + self.config.coeffs)) + cr0.T
+        return CalibResult(alpha, realVol, T)
+
+    def _get_prev_result(self, raw_data: dict) -> CalibResult:
+        keys = list(raw_data.keys())
+        sel_prev_df = self.prev_df[keys]
+        raw_df = pd.DataFrame(raw_data)
+        idx = (sel_prev_df - raw_df).pow(2).sum(axis=0).argmin()
+        row = self.prev_df.iloc[idx][self.fields]
+        return CalibResult(**row.to_dict())
+
+    @staticmethod
+    def print(message: str):
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+        text = "[{}] {}".format(dt_string, message)
+        return print(text)
 
     def emit_start(self, meta: dict) -> str:
         user_meta = self.config.metadata
