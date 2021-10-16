@@ -446,7 +446,7 @@ class LivePlot(QtAwareCallback):
 
             if legend_keys is None:
                 legend_keys = []
-            self.legend_keys = ['scan_id'] + legend_keys
+            self.legend_keys = legend_keys
             if x is not None:
                 self.x, *others = get_obj_fields([x])
             else:
@@ -481,9 +481,9 @@ class LivePlot(QtAwareCallback):
         label = " :: ".join(
             [str(doc.get(name, name)) for name in self.legend_keys])
         kwargs = ChainMap(self.kwargs, {'label': label})
-        self.current_data_line, = self.ax.plot([], [], **kwargs)
-        self.current_fit_line, = self.ax.plot([], [], **kwargs)
-        self.current_diff_line = self.ax.plot([], [], **kwargs)
+        self.current_data_line, = self.ax.plot([], [], label="data", **kwargs)
+        self.current_fit_line, = self.ax.plot([], [], label="fit", **kwargs)
+        self.current_diff_line = self.ax.plot([], [], label="diff", **kwargs)
         self.lines.append(self.current_data_line)
         legend = self.ax.legend(loc=0, title=self.legend_title)
         try:
