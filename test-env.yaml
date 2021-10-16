@@ -4,6 +4,7 @@ channels:
   - defaults
 dependencies:
   - bluesky
+  - watchdog
   - suitcase-csv
   - pandas
   - numpy
