@@ -2,7 +2,7 @@
 r_exp 18.80371332 r_exp_dash 32.65252888 r_wp 2.968131082 r_wp_dash 5.154140792 r_p 2.281218015 r_p_dash 5.336032943 weighted_Durbin_Watson 0.006710439537 gof 0.1578481351
 iters 100000
 do_errors
-xdd "{xy_file}"
+xdd "xy_file"
 	r_exp 18.80371332 r_exp_dash 32.65252888 r_wp 2.968131082 r_wp_dash 5.154140792 r_p 2.281218015 r_p_dash 5.336032943 weighted_Durbin_Watson 0.006710439537 gof 0.1578481351
 	x_calculation_step 0.000764
 	bkg @ 17.6830783 -7.468990733 3.802896906 -4.544634697 3.162787072 -0.1698535003 0.6962715313 -0.5196764379 -0.2303457493
@@ -31,12 +31,12 @@ xdd "{xy_file}"
 		local AlBragg = Get(r_bragg) ;: 0
 		prm Vol_Rod = Get(cell_volume) ;:  176.87166`_0.00914
 
-out "{res_file}"
+out "res_file"
 	Out(Get(r_wp), "%11.10f\n")
 	Out(Vol_Rod, "%11.10f\n")
 	'Out(LatLiCl, "%11.10f\n")
 
-xdd_out "{fit_file}"
+xdd_out "fit_file" load out_record out_fmt out_eqn 'Can be removed to speed up refinements
      {
          "%11.6f," = X;
          "%11.6f," = Yobs;
