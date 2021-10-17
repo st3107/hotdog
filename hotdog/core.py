@@ -1,3 +1,4 @@
+import collections
 import dataclasses
 import dataclasses as dcs
 import logging
@@ -456,6 +457,7 @@ class VisServer(RemoteDispatcher):
     def __init__(self, config: Config):
         self.config = config
         super(VisServer, self).__init__((self.config.proxy.host, self.config.proxy.out_port))
+        install_qt_kicker(self.loop)
         self.fitplot = FitPlot("I", "Icalc", "tth")
         self.subscribe(self.fitplot)
         self.livetable = LiveTable(self.config.processor.data_keys + ["Vol", "alpha", "realVol", "T"])
@@ -472,7 +474,15 @@ class VisServer(RemoteDispatcher):
         else:
             self.liveplot = LivePlot("T")
             self.subscribe(self.liveplot)
-        install_qt_kicker(self.loop)
+        self.hueplot = HuePlot("T", data_keys, "time", marker="o")
+        self.subscribe(self.hueplot)
+
+    @staticmethod
+    def print(message: str):
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+        text = "[{}] {}".format(dt_string, message)
+        return print(text)
 
     @classmethod
     def from_dict(cls, config_dct: dict):
@@ -611,25 +621,138 @@ class FitPlot(QtAwareCallback):
         # Rescale and redraw.
         self.ax.relim(visible_only=True)
         self.ax.autoscale_view(tight=True)
-        self.ax.figure.canvas.draw()
+        self.ax.figure.canvas.draw_idle()
         plt.pause(0.01)
 
     def stop(self, doc):
         if len(self.x_data) == 0:
-            print('LivePlot did not get any data that corresponds to the '
+            print('FitPlot did not get any data that corresponds to the '
                   'x axis. {}'.format(self.x))
         if len(self.y_data) == 0:
-            print('LivePlot did not get any data that corresponds to the '
+            print('FitPlot did not get any data that corresponds to the '
                   'y axis. {}'.format(self.y))
         if len(self.ycalc_data) == 0:
-            print('LivePlot did not get any data that corresponds to the '
+            print('FitPlot did not get any data that corresponds to the '
                   'ycalc axis. {}'.format(self.ycalc))
         if len(self.y_data) != len(self.x_data):
-            print('LivePlot has a different number of elements for x ({}) and'
+            print('FitPlot has a different number of elements for x ({}) and'
                   'y ({})'.format(len(self.x_data), len(self.y_data)))
         if len(self.ycalc_data) != len(self.x_data):
-            print('LivePlot has a different number of elements for x ({}) and'
+            print('FitPlot has a different number of elements for x ({}) and'
                   'ycalc ({})'.format(len(self.x_data), len(self.ycalc_data)))
+        super().stop(doc)
+
+
+@make_class_safe(logger=logger)
+class HuePlot(QtAwareCallback):
+    def __init__(self, y, hue, x=None, *, offset: float = 0., xlim=None, ylim=None,
+                 ax=None, fig=None, epoch='run', **kwargs):
+        super().__init__(use_teleporter=kwargs.pop('use_teleporter', None))
+        self.__setup_lock = threading.Lock()
+        self.__setup_event = threading.Event()
+
+        def setup():
+            # Run this code in start() so that it runs on the correct thread.
+            nonlocal y, hue, x, offset, xlim, ylim, ax, fig, epoch, kwargs
+            import matplotlib.pyplot as plt
+            with self.__setup_lock:
+                if self.__setup_event.is_set():
+                    return
+                self.__setup_event.set()
+            if fig is not None:
+                if ax is not None:
+                    raise ValueError("Values were given for both `fig` and `ax`. "
+                                     "Only one can be used; prefer ax.")
+                warnings.warn("The `fig` keyword arugment of LivePlot is "
+                              "deprecated and will be removed in the future. "
+                              "Instead, use the new keyword argument `ax` to "
+                              "provide specific Axes to plot on.")
+                ax = fig.gca()
+            if ax is None:
+                fig, ax = plt.subplots()
+            self.ax = ax
+
+            if x is not None:
+                self.x, *others = get_obj_fields([x])
+            else:
+                self.x = 'seq_num'
+            self.y, *others = get_obj_fields([y])
+            self.hue = get_obj_fields(hue)
+            self.ax.set_ylabel(y)
+            self.ax.set_xlabel(x or 'sequence #')
+            if xlim is not None:
+                self.ax.set_xlim(*xlim)
+            if ylim is not None:
+                self.ax.set_ylim(*ylim)
+            self.ax.margins(.1)
+            self.kwargs = kwargs
+            self.legend = None
+            self.legend_title = ", ".join([name for name in hue])
+            self._epoch_offset = None  # used if x == 'time'
+            self._epoch = epoch
+            self.offset = offset
+            self.hue2x = collections.defaultdict(list)
+            self.hue2y = collections.defaultdict(list)
+            self.hue2line = dict()
+
+        self.__setup = setup
+
+    def start(self, doc):
+        self.__setup()
+        # The doc is not used; we just use the signal that a new run began.
+        self._epoch_offset = doc['time']  # used if self.x == 'time'
+        super().start(doc)
+
+    def event(self, doc):
+        "Unpack data from the event and call self.update()."
+        # This outer try/except block is needed because multiple event
+        # streams will be emitted by the RunEngine and not all event
+        # streams will have the keys we want.
+        try:
+            # This inner try/except block handles seq_num and time, which could
+            # be keys in the data or accessing the standard entries in every
+            # event.
+            try:
+                new_x = doc['data'][self.x]
+            except KeyError:
+                if self.x in ('time', 'seq_num'):
+                    new_x = doc[self.x]
+                else:
+                    raise
+            new_y = doc['data'][self.y]
+            new_hue = tuple(doc['data'][k] for k in self.hue)
+        except KeyError:
+            # wrong event stream, skip it
+            return
+
+        # Special-case 'time' to plot against against experiment epoch, not
+        # UNIX epoch.
+        if self.x == 'time' and self._epoch == 'run':
+            new_x -= self._epoch_offset
+
+        self.update_caches(new_x, new_y, new_hue)
+        self.update_plot(new_hue)
+        super().event(doc)
+
+    def update_caches(self, x, y, hue):
+        self.hue2x[hue].append(x)
+        self.hue2y[hue].append(y)
+
+    def update_plot(self, hue):
+        if hue not in self.hue2line:
+            label = ", ".join(["{:.2f}".format(h) for h in hue])
+            self.hue2line[hue], = self.ax.plot([], [], label=label, **self.kwargs)
+        self.hue2line[hue].set_data(self.hue2x[hue], self.hue2y[hue])
+        # Rescale and redraw.
+        self.ax.relim(visible_only=True)
+        self.ax.autoscale_view(tight=True)
+        self.ax.figure.canvas.draw_idle()
+        self.legend = self.ax.legend(loc=0, title=self.legend_title)
+        plt.pause(0.01)
+
+    def stop(self, doc):
+        if len(self.hue2line) == 0:
+            print('HuePlot did not get any data.')
         super().stop(doc)
 
 
