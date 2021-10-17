@@ -185,7 +185,7 @@ class Processor(LiveDispatcher):
         coeffs = P.polymul(
             P.polymul(self.config.a_coeffs, self.config.b_coeffs), self.config.c_coeffs
         )[:self.config.n_coeffs]
-        self.poly = P.Polynomial(coeffs, domain=[0., 1e4], window=[0., 1e4])
+        self.poly = P.Polynomial(coeffs, domain=[-1e5, 1e5], window=[-1e5, 1e5])
         self.stopped = False
         self.original_time = None
         self.csv_serializer = Serializer(str(self.working_dir), "{start[uid]}_summary_")
