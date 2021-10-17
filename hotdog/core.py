@@ -228,6 +228,7 @@ class Processor(LiveDispatcher):
             The path to the XRD data file.
         """
         _filename = pathlib.Path(filename)
+        self.original_time = _filename.lstat().st_mtime
         self.print("Start processing {}.".format(_filename.name))
         # count
         self.count += 1
@@ -244,7 +245,6 @@ class Processor(LiveDispatcher):
             self.create_dir()
         # process file
         data = dict()
-        self.original_time = _filename.lstat().st_mtime
         raw_data = self.parse_filename(filename)
         data.update(raw_data)
         fr = self.run_topas(filename)
@@ -274,8 +274,7 @@ class Processor(LiveDispatcher):
         return
 
     def emit(self, name, doc):
-        if name == DocumentNames.event:
-            doc["time"] = self.original_time
+        doc["time"] = self.original_time
         return super(Processor, self).emit(name, doc)
 
     def run_topas(self, filename: str) -> FitResult:
