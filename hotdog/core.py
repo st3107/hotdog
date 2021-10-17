@@ -1,38 +1,36 @@
 import dataclasses
+import dataclasses as dcs
+import logging
 import pathlib
 import subprocess
-import sys
+import threading
+import time
 import typing
+import warnings
 from dataclasses import dataclass
-import dataclasses as dcs
 from datetime import datetime
 
+import bluesky.utils as bus
+import dacite
+import fire
+import intake.source.utils as isu
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
+import pandas as pd
+import yaml
+from bluesky.callbacks.core import get_obj_fields, make_class_safe, LiveTable
+from bluesky.callbacks.mpl_plotting import LivePlot, LiveScatter
+from bluesky.callbacks.mpl_plotting import QtAwareCallback
+from bluesky.callbacks.stream import LiveDispatcher
+from bluesky.callbacks.zmq import RemoteDispatcher, Publisher, Proxy
+from event_model import DocumentNames
 from numpy.polynomial import polynomial as P
 from scipy.optimize import fsolve
 from suitcase.csv import Serializer
-from bluesky.callbacks.stream import LiveDispatcher
-import bluesky.utils as bus
-import intake.source.utils as isu
-import threading
-import warnings
-from bluesky.callbacks.mpl_plotting import QtAwareCallback
-from bluesky.callbacks.zmq import RemoteDispatcher, Publisher, Proxy
-from bluesky.callbacks.core import get_obj_fields, make_class_safe, LiveTable
-import logging
 from watchdog.events import PatternMatchingEventHandler, FileCreatedEvent
 from watchdog.observers import Observer
-import time
-import dacite
-import yaml
-import fire
-from hotdog.vend import install_qt_kicker
-from bluesky.callbacks.mpl_plotting import LivePlot, LiveScatter
-from event_model import DocumentNames
-import warnings
 
+from hotdog.vend import install_qt_kicker
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +47,6 @@ class ObserverConfig:
 
 @dataclass
 class ProcessorConfig:
-
     mode: int = 0
     T0: float = 273.15
     V0: float = 0.
@@ -70,7 +67,6 @@ class ProcessorConfig:
 
 @dataclass
 class ProxyConfig:
-
     host: str = "localhost"
     in_port: int = 5567
     out_port: int = 5568
@@ -78,7 +74,6 @@ class ProxyConfig:
 
 @dataclass
 class Config:
-
     observer: ObserverConfig
     processor: ProcessorConfig
     proxy: ProxyConfig
@@ -86,7 +81,6 @@ class Config:
 
 @dataclass
 class FitResult:
-
     Rwp: float
     Vol: float
     tth: np.ndarray
@@ -97,7 +91,6 @@ class FitResult:
 
 @dataclass
 class CalibResult:
-
     alpha: float
     realVol: float
     T: float
@@ -105,7 +98,6 @@ class CalibResult:
 
 @dataclass
 class Result:
-
     fit: FitResult
     calib: CalibResult
 
