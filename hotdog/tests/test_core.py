@@ -165,5 +165,5 @@ def test_vis_server_callbacks(tmp_path):
     )
     processor = core.Processor(config)
     processor.subscribe(core.LiveTable(["x", "y", "realVol"]))
-    processor.subscribe(core.LivePlot("I", "Icalc", "tth"))
+    processor.subscribe(core.FitPlot("I", "Icalc", "tth"))
     processor.process_many_files(list(map(str, DATA_DIR.glob("*.xy"))))

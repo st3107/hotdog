@@ -16,7 +16,6 @@ from suitcase.csv import Serializer
 from bluesky.callbacks.stream import LiveDispatcher
 import bluesky.utils as bus
 import intake.source.utils as isu
-from collections import ChainMap
 import threading
 import warnings
 from bluesky.callbacks.mpl_plotting import QtAwareCallback
@@ -30,9 +29,9 @@ import dacite
 import yaml
 import fire
 from hotdog.vend import install_qt_kicker
-from bluesky.utils import new_uid
+from bluesky.callbacks.mpl_plotting import LivePlot, LiveScatter
 from event_model import DocumentNames
-from collections import ChainMap
+import warnings
 
 
 logger = logging.getLogger(__name__)
@@ -466,10 +465,22 @@ class VisServer(RemoteDispatcher):
     def __init__(self, config: Config):
         self.config = config
         super(VisServer, self).__init__((self.config.proxy.host, self.config.proxy.out_port))
-        self.liveplot = LivePlot("I", "Icalc", "tth")
+        self.fitplot = FitPlot("I", "Icalc", "tth")
+        self.subscribe(self.fitplot)
         self.livetable = LiveTable(self.config.processor.data_keys + ["Vol", "alpha", "realVol", "T"])
-        self.subscribe(self.liveplot)
         self.subscribe(self.livetable)
+        self.livescatter = None
+        self.liveplot = None
+        data_keys = self.config.processor.data_keys
+        if len(data_keys) == 2:
+            self.livescatter = LiveScatter(*data_keys, "T")
+            self.subscribe(self.livescatter)
+        elif len(data_keys) == 1:
+            self.liveplot = LivePlot("T", data_keys[0])
+            self.subscribe(self.liveplot)
+        else:
+            self.liveplot = LivePlot("T")
+            self.subscribe(self.liveplot)
         install_qt_kicker(self.loop)
 
     @classmethod
@@ -491,7 +502,7 @@ class VisServer(RemoteDispatcher):
 
 
 @make_class_safe(logger=logger)
-class LivePlot(QtAwareCallback):
+class FitPlot(QtAwareCallback):
     def __init__(self, y, ycalc, x=None, *, offset: float = 0., legend_keys=None, xlim=None, ylim=None,
                  ax=None, fig=None, epoch='run', **kwargs):
         super().__init__(use_teleporter=kwargs.pop('use_teleporter', None))
@@ -671,7 +682,9 @@ def run_hotdogvis(config_file: str) -> None:
     """Start a HotDog visualization server using the configuration file."""
     server = VisServer.from_file(config_file)
     try:
-        server.start()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            server.start()
         while True:
             time.sleep(1.)
     except KeyboardInterrupt:
