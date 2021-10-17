@@ -198,6 +198,7 @@ class Processor(LiveDispatcher):
         self.original_time = None
         self.csv_serializer = Serializer(str(self.working_dir), "{start[uid]}_summary_")
         self.subscribe(self.csv_serializer)
+        self.print("Processor is ready. The data will be output in {}.".format(str(self.working_dir)))
 
     def load_prev_df(self):
         if self.config.mode == 0:
@@ -235,6 +236,8 @@ class Processor(LiveDispatcher):
         filename : str
             The path to the XRD data file.
         """
+        _filename = pathlib.Path(filename)
+        self.print("Start processing {}.".format(_filename.name))
         # count
         self.count += 1
         # emit start if this is the first file
@@ -250,7 +253,7 @@ class Processor(LiveDispatcher):
             self.create_dir()
         # process file
         data = dict()
-        self.original_time = pathlib.Path(filename).lstat().st_mtime
+        self.original_time = _filename.lstat().st_mtime
         raw_data = self.parse_filename(filename)
         data.update(raw_data)
         fr = self.run_topas(filename)
