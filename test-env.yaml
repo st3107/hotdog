@@ -4,6 +4,8 @@ channels:
   - defaults
 dependencies:
   - bluesky
+  - fire
+  - scipy
   - watchdog
   - suitcase-csv
   - pandas

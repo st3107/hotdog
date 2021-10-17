@@ -1,12 +1,11 @@
-import collections
 import dataclasses
 import pathlib
 import subprocess
+import sys
 import typing
 from dataclasses import dataclass
 import dataclasses as dcs
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -15,16 +14,26 @@ from numpy.polynomial import polynomial as P
 from scipy.optimize import fsolve
 from suitcase.csv import Serializer
 from bluesky.callbacks.stream import LiveDispatcher
-from bluesky.callbacks.best_effort import BestEffortCallback
 import bluesky.utils as bus
 import intake.source.utils as isu
 from collections import ChainMap
-import numpy as np
 import threading
 import warnings
 from bluesky.callbacks.mpl_plotting import QtAwareCallback
-from bluesky.callbacks.core import CallbackBase, get_obj_fields, make_class_safe
+from bluesky.callbacks.zmq import RemoteDispatcher, Publisher, Proxy
+from bluesky.callbacks.core import get_obj_fields, make_class_safe, LiveTable
 import logging
+from watchdog.events import PatternMatchingEventHandler, FileCreatedEvent
+from watchdog.observers import Observer
+import time
+import dacite
+import yaml
+import fire
+from hotdog.vend import install_qt_kicker
+from bluesky.utils import new_uid
+from event_model import DocumentNames
+from collections import ChainMap
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +41,21 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ObserverConfig:
     # TODO: fill in
-    pass
+    watch_path: str = None
+    patterns: typing.Union[None, typing.List[str]] = None
+    ignore_patterns: typing.Union[None, typing.List[str]] = None
+    recursive: bool = True
+    timeout: typing.Union[None, float] = None
 
 
 @dataclass
 class ProcessorConfig:
 
     mode: int = 0
-    T0: float = 273.15,
+    T0: float = 273.15
     V0: float = 0.
     RT: float = 293.
-    prev_csv: str = None
+    prev_csv: typing.Union[None, str] = None
     a_coeffs: typing.List = None
     b_coeffs: typing.List = None
     c_coeffs: typing.List = None
@@ -57,10 +70,19 @@ class ProcessorConfig:
 
 
 @dataclass
+class ProxyConfig:
+
+    host: str = "localhost"
+    in_port: int = 5567
+    out_port: int = 5568
+
+
+@dataclass
 class Config:
 
     observer: ObserverConfig
     processor: ProcessorConfig
+    proxy: ProxyConfig
 
 
 @dataclass
@@ -93,9 +115,60 @@ class ProcessorError(Exception):
     pass
 
 
-class Observer:
+class Handler(PatternMatchingEventHandler):
+
+    def __init__(self, config: Config):
+        super(Handler, self).__init__(config.observer.patterns, config.observer.ignore_patterns)
+        self.config = config
+        self.processor = Processor(config.processor)
+
+    def on_any_event(self, event):
+        if isinstance(event, FileCreatedEvent):
+            self.processor.process_a_file(str(event.src_path))
+
+
+class Server(Observer):
     """Monitor the directory and let Processor process the newly created files."""
-    pass
+
+    def __init__(self, config: Config):
+        super(Server, self).__init__()
+        self.config = config
+        self.handler = Handler(config)
+        self.processor = self.handler.processor
+        self.publisher = Publisher((config.proxy.host, config.proxy.in_port))
+        self.processor.subscribe(self.publisher)
+        self.schedule(self.handler, path=config.observer.watch_path, recursive=config.observer.recursive)
+
+    def run_until_timeout(self):
+        timeout = self.config.observer.timeout
+        if timeout is None:
+            timeout = float("inf")
+        self.start()
+        t0 = time.time()
+        try:
+            while time.time() - t0 <= timeout and not self.handler.processor.stopped:
+                time.sleep(1.)
+            self.stop()
+        except KeyboardInterrupt:
+            self.stop()
+        self.join()
+
+    @classmethod
+    def from_dict(cls, config_dct: dict):
+        config = dacite.from_dict(Config, config_dct)
+        return cls(config)
+
+    @classmethod
+    def from_file(cls, config_file: str):
+        with pathlib.Path(config_file).open("r") as f:
+            dct = yaml.safe_load(f)
+        return cls.from_dict(dct)
+
+    def dump_config(self, config_file: str) -> None:
+        dct = dcs.asdict(self.config)
+        with pathlib.Path(config_file).open("w") as f:
+            yaml.safe_dump(dct, f)
+        return
 
 
 class Processor(LiveDispatcher):
@@ -121,13 +194,10 @@ class Processor(LiveDispatcher):
             P.polymul(self.config.a_coeffs, self.config.b_coeffs), self.config.c_coeffs
         )[:self.config.n_coeffs]
         self.poly = P.Polynomial(coeffs, domain=[-1e5, 1e5], window=[-1e5, 1e5])
-        self.bec = BestEffortCallback()
+        self.stopped = False
+        self.original_time = None
         self.csv_serializer = Serializer(str(self.working_dir), "{start[uid]}_summary_")
-        self.fig = plt.figure()
-        self.liveplot = LivePlot("I", "Icalc", "tth", fig=self.fig)
-        self.subscribe(self.bec)
         self.subscribe(self.csv_serializer)
-        self.subscribe(self.liveplot)
 
     def load_prev_df(self):
         if self.config.mode == 0:
@@ -169,11 +239,18 @@ class Processor(LiveDispatcher):
         self.count += 1
         # emit start if this is the first file
         if self.count <= 1:
-            self.emit_start({})
+            self.emit_start(
+                {
+                    "plan_type": "generator",
+                    'plan_name': "hotdog calibration",
+                    "scan_id": 1
+                }
+            )
             self.emit_descriptor()
             self.create_dir()
         # process file
-        data = {"original_time": pathlib.Path(filename).lstat().st_mtime}
+        data = dict()
+        self.original_time = pathlib.Path(filename).lstat().st_mtime
         raw_data = self.parse_filename(filename)
         data.update(raw_data)
         fr = self.run_topas(filename)
@@ -202,6 +279,11 @@ class Processor(LiveDispatcher):
             self.process_a_file(f)
         return
 
+    def emit(self, name, doc):
+        if name == DocumentNames.event:
+            doc["time"] = self.original_time
+        return super(Processor, self).emit(name, doc)
+
     def run_topas(self, filename: str) -> FitResult:
         wd = self.saving_dir
         tc_path = self.tc_path
@@ -209,8 +291,6 @@ class Processor(LiveDispatcher):
         xy_file = pathlib.Path(filename)
         out_fp = wd.joinpath(xy_file.stem)
         inp_file = out_fp.with_suffix(".inp")
-        if inp_file.is_file():
-            raise ProcessorError("{} already exits.".format(str(inp_file)))
         res_file = out_fp.with_suffix(".res")
         fit_file = out_fp.with_suffix(".fit")
         out_file = out_fp.with_suffix(".out")
@@ -367,56 +447,48 @@ class Processor(LiveDispatcher):
 
     def emit_descriptor(self) -> str:
         uid = bus.new_uid()
-        self.descriptor({"uid": uid, "data_keys": {}})
+        self.descriptor({"uid": uid, "data_keys": {}, "name": "primary"})
         self.desc_uid = uid
         return uid
 
     def emit_stop(self, exit_status: str) -> str:
         uid = bus.new_uid()
         self.stop({"uid": uid, "exit_status": exit_status})
+        self.stopped = True
         return uid
+
+
+class VisServer(RemoteDispatcher):
+
+    def __init__(self, config: Config):
+        self.config = config
+        super(VisServer, self).__init__((self.config.proxy.host, self.config.proxy.out_port))
+        self.liveplot = LivePlot("I", "Icalc", "tth")
+        self.livetable = LiveTable(self.config.processor.data_keys + ["Vol", "alpha", "realVol", "T"])
+        self.subscribe(self.liveplot)
+        self.subscribe(self.livetable)
+        install_qt_kicker(self.loop)
+
+    @classmethod
+    def from_dict(cls, config_dct: dict):
+        config = dacite.from_dict(Config, config_dct)
+        return cls(config)
+
+    @classmethod
+    def from_file(cls, config_file: str):
+        with pathlib.Path(config_file).open("r") as f:
+            dct = yaml.safe_load(f)
+        return cls.from_dict(dct)
+
+    def dump_config(self, config_file: str) -> None:
+        dct = dcs.asdict(self.config)
+        with pathlib.Path(config_file).open("w") as f:
+            yaml.safe_dump(dct, f)
+        return
 
 
 @make_class_safe(logger=logger)
 class LivePlot(QtAwareCallback):
-    """
-    Build a function that updates a plot from a stream of Events.
-
-    Note: If your figure blocks the main thread when you are trying to
-    scan with this callback, call `plt.ion()` in your IPython session.
-
-    Parameters
-    ----------
-    y : str
-        the name of a data field in an Event
-    x : str, optional
-        the name of a data field in an Event, or 'seq_num' or 'time'
-        If None, use the Event's sequence number.
-        Special case: If the Event's data includes a key named 'seq_num' or
-        'time', that takes precedence over the standard 'seq_num' and 'time'
-        recorded in every Event.
-    legend_keys : list, optional
-        The list of keys to extract from the RunStart document and format
-        in the legend of the plot. The legend will always show the
-        scan_id followed by a colon ("1: ").  Each
-    xlim : tuple, optional
-        passed to Axes.set_xlim
-    ylim : tuple, optional
-        passed to Axes.set_ylim
-    ax : Axes, optional
-        matplotib Axes; if none specified, new figure and axes are made.
-    fig : Figure, optional
-        deprecated: use ax instead
-    epoch : {'run', 'unix'}, optional
-        If 'run' t=0 is the time recorded in the RunStart document. If 'unix',
-        t=0 is 1 Jan 1970 ("the UNIX epoch"). Default is 'run'.
-    All additional keyword arguments are passed through to ``Axes.plot``.
-
-    Examples
-    --------
-    >>> my_plotter = LivePlot('det', 'motor', legend_keys=['sample'])
-    >>> RE(my_scan, my_plotter)
-    """
     def __init__(self, y, ycalc, x=None, *, offset: float = 0., legend_keys=None, xlim=None, ylim=None,
                  ax=None, fig=None, epoch='run', **kwargs):
         super().__init__(use_teleporter=kwargs.pop('use_teleporter', None))
@@ -461,16 +533,15 @@ class LivePlot(QtAwareCallback):
                 self.ax.set_ylim(*ylim)
             self.ax.margins(.1)
             self.kwargs = kwargs
-            self.lines = []
             self.legend = None
             self.legend_title = " :: ".join([name for name in self.legend_keys])
             self._epoch_offset = None  # used if x == 'time'
             self._epoch = epoch
-            self.offest = offset
-            self.x_data = None
-            self.y_data = None
-            self.ycalc_data = None
-            self.ydiff_data = None
+            self.offset = offset
+            self.x_data = []
+            self.y_data = []
+            self.ycalc_data = []
+            self.ydiff_data = []
 
         self.__setup = setup
 
@@ -478,13 +549,10 @@ class LivePlot(QtAwareCallback):
         self.__setup()
         # The doc is not used; we just use the signal that a new run began.
         self._epoch_offset = doc['time']  # used if self.x == 'time'
-        label = " :: ".join(
-            [str(doc.get(name, name)) for name in self.legend_keys])
-        kwargs = ChainMap(self.kwargs, {'label': label})
+        kwargs = self.kwargs
         self.current_data_line, = self.ax.plot([], [], label="data", **kwargs)
         self.current_fit_line, = self.ax.plot([], [], label="fit", **kwargs)
-        self.current_diff_line = self.ax.plot([], [], label="diff", **kwargs)
-        self.lines.append(self.current_data_line)
+        self.current_diff_line, = self.ax.plot([], [], label="diff", **kwargs)
         legend = self.ax.legend(loc=0, title=self.legend_title)
         try:
             # matplotlib v3.x
@@ -533,21 +601,22 @@ class LivePlot(QtAwareCallback):
 
     def update_plot(self):
         self.current_data_line.set_data(self.x_data, self.y_data)
-        self.current_fit_line.set_data(self.x_data, self.y_data)
+        self.current_fit_line.set_data(self.x_data, self.ycalc_data)
         self.current_diff_line.set_data(self.x_data, self.ydiff_data + self.offset)
         # Rescale and redraw.
         self.ax.relim(visible_only=True)
         self.ax.autoscale_view(tight=True)
-        self.ax.figure.canvas.draw_idle()
+        self.ax.figure.canvas.draw()
+        plt.pause(0.01)
 
     def stop(self, doc):
-        if not self.x_data:
+        if len(self.x_data) == 0:
             print('LivePlot did not get any data that corresponds to the '
                   'x axis. {}'.format(self.x))
-        if not self.y_data:
+        if len(self.y_data) == 0:
             print('LivePlot did not get any data that corresponds to the '
                   'y axis. {}'.format(self.y))
-        if not self.ycalc_data:
+        if len(self.ycalc_data) == 0:
             print('LivePlot did not get any data that corresponds to the '
                   'ycalc axis. {}'.format(self.ycalc))
         if len(self.y_data) != len(self.x_data):
@@ -557,3 +626,73 @@ class LivePlot(QtAwareCallback):
             print('LivePlot has a different number of elements for x ({}) and'
                   'ycalc ({})'.format(len(self.x_data), len(self.ycalc_data)))
         super().stop(doc)
+
+
+class MyProxy(Proxy):
+
+    def __init__(self, config: Config):
+        self.config = config.proxy
+        super(MyProxy, self).__init__(self.config.in_port, self.config.out_port)
+
+    @classmethod
+    def from_dict(cls, config_dct: dict):
+        config = dacite.from_dict(Config, config_dct)
+        return cls(config)
+
+    @classmethod
+    def from_file(cls, config_file: str):
+        with pathlib.Path(config_file).open("r") as f:
+            dct = yaml.safe_load(f)
+        return cls.from_dict(dct)
+
+    def dump_config(self, config_file: str) -> None:
+        dct = dcs.asdict(self.config)
+        with pathlib.Path(config_file).open("w") as f:
+            yaml.safe_dump(dct, f)
+        return
+
+
+def run_hotdog(config_file: str) -> None:
+    """Start a HotDog server using the configuration file."""
+    server = Server.from_file(config_file)
+    server.run_until_timeout()
+    return
+
+
+def hotdog() -> None:
+    fire.Fire(run_hotdog)
+    return
+
+
+def run_hotdogvis(config_file: str) -> None:
+    """Start a HotDog visualization server using the configuration file."""
+    server = VisServer.from_file(config_file)
+    try:
+        server.start()
+        while True:
+            time.sleep(1.)
+    except KeyboardInterrupt:
+        server.closed = True
+    return
+
+
+def hotdogvis() -> None:
+    fire.Fire(run_hotdogvis)
+    return
+
+
+def run_hotdogproxy(config_file: str) -> None:
+    """Start a HotDog proxy server using the configuration file."""
+    server = MyProxy.from_file(config_file)
+    try:
+        server.start()
+        while True:
+            time.sleep(1.)
+    except KeyboardInterrupt:
+        server.closed = True
+    return
+
+
+def hotdogproxy() -> None:
+    fire.Fire(run_hotdogproxy)
+    return

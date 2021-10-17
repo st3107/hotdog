@@ -45,6 +45,9 @@ setup(
     entry_points={
         'console_scripts': [
             # 'command = some.module:some_function',
+            "hotdog = hotdog.core:hotdog",
+            "hotdogvis = hotdog.core:hotdogvis",
+            "hotdogproxy = hotdog.core:hotdogproxy"
         ],
     },
     include_package_data=True,

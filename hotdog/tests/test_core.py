@@ -1,3 +1,4 @@
+import dataclasses
 import pathlib
 from pkg_resources import resource_filename
 
@@ -137,3 +138,32 @@ def test_process_many_files_mode_2_with_prev_csv(tmp_path):
     csv_files = list(tmp_path.glob("*.csv"))
     assert len(csv_files) == 1
     print(csv_files[0].read_text())
+
+
+def test_create_a_server_from_file():
+    config_file = str(DATA_DIR.joinpath("example_config.yaml"))
+    core.Server.from_file(config_file)
+
+
+def test_vis_server_callbacks(tmp_path):
+    config = core.ProcessorConfig(
+        mode=2,
+        T0=273.15,
+        V0=253.82,
+        prev_csv=str(DATA_DIR.joinpath("rt_run.csv")),
+        a_coeffs=[1., 6.55e-6, 1.82e-9],
+        b_coeffs=[1., 6.55e-6, 1.82e-9],
+        c_coeffs=[1., 6.54e-6, 2.60e-9],
+        tc_path="C:\\TOPAS6\\tc.exe",
+        inp_path=str(DATA_DIR.joinpath("Al2O3.inp")),
+        working_dir=str(tmp_path),
+        xy_file_fmt=r"{num1}Al2O3_009_double_grid_Ar_100p_20190822-210853_Grid_X_{x}_mm_Grid_Y_{y}_mm_a428d7_{"
+                    r"num2}_dark_corrected_img.xy",
+        data_keys=["x", "y"],
+        metadata={},
+        n_scan=2
+    )
+    processor = core.Processor(config)
+    processor.subscribe(core.LiveTable(["x", "y", "realVol"]))
+    processor.subscribe(core.LivePlot("I", "Icalc", "tth"))
+    processor.process_many_files(list(map(str, DATA_DIR.glob("*.xy"))))
