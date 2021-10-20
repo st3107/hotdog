@@ -24,7 +24,6 @@ from bluesky.callbacks.mpl_plotting import LivePlot, LiveScatter
 from bluesky.callbacks.mpl_plotting import QtAwareCallback
 from bluesky.callbacks.stream import LiveDispatcher
 from bluesky.callbacks.zmq import RemoteDispatcher, Publisher, Proxy
-from event_model import DocumentNames
 from numpy.polynomial import polynomial as P
 from scipy.optimize import fsolve
 from suitcase.csv import Serializer
@@ -75,9 +74,9 @@ class ProxyConfig:
 
 @dataclass
 class Config:
-    observer: ObserverConfig
-    processor: ProcessorConfig
-    proxy: ProxyConfig
+    observer: ObserverConfig = ObserverConfig()
+    processor: ProcessorConfig = ProcessorConfig()
+    proxy: ProxyConfig = ProxyConfig()
 
 
 @dataclass
@@ -112,7 +111,7 @@ class Handler(PatternMatchingEventHandler):
     def __init__(self, config: Config):
         super(Handler, self).__init__(config.observer.patterns, config.observer.ignore_patterns)
         self.config = config
-        self.processor = Processor(config.processor)
+        self.processor = Processor(config)
 
     def on_any_event(self, event):
         if isinstance(event, FileCreatedEvent):
@@ -166,9 +165,10 @@ class Server(Observer):
 class Processor(LiveDispatcher):
     """Process the data file and publish the results in an event stream."""
 
-    def __init__(self, config: ProcessorConfig):
+    def __init__(self, config: Config):
         super(Processor, self).__init__()
-        self.config = config
+        self.input_config = config
+        self.config = config.processor
         self.prev_df = None
         self.load_prev_df()
         self.inp_template = pathlib.Path(self.config.inp_path).read_text()
@@ -188,7 +188,8 @@ class Processor(LiveDispatcher):
         self.poly = P.Polynomial(coeffs, domain=[-1e5, 1e5], window=[-1e5, 1e5])
         self.stopped = False
         self.original_time = None
-        self.csv_serializer = Serializer(str(self.working_dir), "{start[uid]}_summary_")
+        self.file_prefix = "{start[uid]}_summary_"
+        self.csv_serializer = Serializer(str(self.working_dir), self.file_prefix)
         self.subscribe(self.csv_serializer)
         self.print("Processor is ready. The data will be output in {}.".format(str(self.working_dir)))
 
@@ -368,7 +369,7 @@ class Processor(LiveDispatcher):
     def run_calib_1(self, fitresult: FitResult) -> CalibResult:
         if self.prev_df is None:
             realVol = fitresult.Vol
-            alpha = 1
+            alpha = 1.
             T = self.config.RT
         else:
             realVol = self.prev_df["realVol"][0]
@@ -392,7 +393,7 @@ class Processor(LiveDispatcher):
         def func(x):
             return V0 * self.poly(x) - realVol
 
-        T = fsolve(func, np.array([1000.]), xtol=1e-4)[0] + T0
+        T = fsolve(func, np.array([400.]), xtol=1e-4)[0] + T0
         return CalibResult(alpha, realVol, T)
 
     def _get_prev_result(self, raw_data: dict) -> CalibResult:
@@ -449,7 +450,22 @@ class Processor(LiveDispatcher):
         uid = bus.new_uid()
         self.stop({"uid": uid, "exit_status": exit_status})
         self.stopped = True
+        self.dump_next_config_file()
         return uid
+
+    def dump_next_config_file(self) -> None:
+        # dump the config for the next run
+        config_dct = dcs.asdict(self.input_config)
+        if self.config.mode < 2:
+            config_dct["processor"]["mode"] += 1
+        prev_df_path = self.working_dir.joinpath(
+            "{}primary.csv".format(self.csv_serializer._templated_file_prefix)
+        )
+        config_dct["processor"]["prev_csv"] = str(prev_df_path)
+        next_config_file = prev_df_path.with_suffix(".yaml")
+        with next_config_file.open("w") as f:
+            yaml.safe_dump(config_dct, f)
+        return
 
 
 class VisServer(RemoteDispatcher):
@@ -530,6 +546,7 @@ class FitPlot(QtAwareCallback):
             if ax is None:
                 fig, ax = plt.subplots()
             self.ax = ax
+            self.ax.cla()
 
             if legend_keys is None:
                 legend_keys = []
@@ -671,6 +688,7 @@ class HuePlot(QtAwareCallback):
             if ax is None:
                 fig, ax = plt.subplots()
             self.ax = ax
+            self.ax.cla()
 
             if x is not None:
                 self.x, *others = get_obj_fields([x])

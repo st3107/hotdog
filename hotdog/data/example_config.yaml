@@ -10,9 +10,9 @@ observer:
   timeout: null
   watch_path: C:\Users\taoso\OneDrive\Documents\inputs
 processor:
-  RT: 293.0
+  RT: 293.15
   T0: 273.15
-  V0: 253.82
+  V0: 254.89
   a_coeffs:
   - 1.0
   - 6.55e-06
@@ -32,8 +32,8 @@ processor:
   metadata: {}
   mode: 2
   n_coeffs: 3
-  n_scan: 2
-  prev_csv: C:\Users\taoso\OneDrive\Documents\hotdog\hotdog\data\rt_run.csv
+  n_scan: 10
+  prev_csv: ""
   tc_path: C:\TOPAS6\tc.exe
   working_dir: C:\Users\taoso\OneDrive\Documents\outputs
-  xy_file_fmt: '{num1}Al2O3_009_double_grid_Ar_100p_20190822-210853_Grid_X_{x}_mm_Grid_Y_{y}_mm_a428d7_{num2}_dark_corrected_img.xy'
+  xy_file_fmt: '{num1}Al2O3_009_jump_air_t_p1cnt_20190822-132504_Grid_X_{x}_mm_Grid_Y_{y}_mm_eurotherm_{temp}_C_{uid1}_{num2}_dark_corrected_img.xy'

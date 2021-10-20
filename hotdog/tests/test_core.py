@@ -1,5 +1,7 @@
 import dataclasses
 import pathlib
+
+import numpy as np
 from pkg_resources import resource_filename
 
 import hotdog.core as core
@@ -8,7 +10,7 @@ DATA_DIR = pathlib.Path(resource_filename("hotdog", "data"))
 
 
 def test_process_a_files_mode_0(tmp_path):
-    config = core.ProcessorConfig(
+    config = core.Config(processor=core.ProcessorConfig(
         mode=0,
         T0=273.15,
         V0=253.82,
@@ -24,7 +26,7 @@ def test_process_a_files_mode_0(tmp_path):
         data_keys=["x", "y"],
         metadata={},
         n_scan=1
-    )
+    ))
     processor = core.Processor(config)
     processor.process_a_file(
         str(
@@ -40,7 +42,7 @@ def test_process_a_files_mode_0(tmp_path):
 
 
 def test_process_many_files_mode_1_no_prev_csv(tmp_path):
-    config = core.ProcessorConfig(
+    config = core.Config(processor=core.ProcessorConfig(
         mode=1,
         T0=273.15,
         V0=253.82,
@@ -56,7 +58,7 @@ def test_process_many_files_mode_1_no_prev_csv(tmp_path):
         data_keys=["x", "y"],
         metadata={},
         n_scan=2
-    )
+    ))
     processor = core.Processor(config)
     processor.process_many_files(list(map(str, DATA_DIR.glob("*.xy"))))
     csv_files = list(tmp_path.glob("*.csv"))
@@ -65,7 +67,7 @@ def test_process_many_files_mode_1_no_prev_csv(tmp_path):
 
 
 def test_process_many_files_mode_1_with_prev_csv(tmp_path):
-    config = core.ProcessorConfig(
+    config = core.Config(processor=core.ProcessorConfig(
         mode=1,
         T0=273.15,
         V0=253.82,
@@ -81,7 +83,7 @@ def test_process_many_files_mode_1_with_prev_csv(tmp_path):
         data_keys=["x", "y"],
         metadata={},
         n_scan=2
-    )
+    ))
     processor = core.Processor(config)
     processor.process_many_files(list(map(str, DATA_DIR.glob("*.xy"))))
     csv_files = list(tmp_path.glob("*.csv"))
@@ -90,7 +92,7 @@ def test_process_many_files_mode_1_with_prev_csv(tmp_path):
 
 
 def test_process_many_files_mode_2_no_prev_csv(tmp_path):
-    config = core.ProcessorConfig(
+    config = core.Config(processor=core.ProcessorConfig(
         mode=2,
         T0=273.15,
         V0=253.82,
@@ -107,7 +109,7 @@ def test_process_many_files_mode_2_no_prev_csv(tmp_path):
         data_keys=["x", "y"],
         metadata={},
         n_scan=2
-    )
+    ))
     processor = core.Processor(config)
     processor.process_many_files(list(map(str, DATA_DIR.glob("*.xy"))))
     csv_files = list(tmp_path.glob("*.csv"))
@@ -116,7 +118,7 @@ def test_process_many_files_mode_2_no_prev_csv(tmp_path):
 
 
 def test_process_many_files_mode_2_with_prev_csv(tmp_path):
-    config = core.ProcessorConfig(
+    config = core.Config(processor=core.ProcessorConfig(
         mode=2,
         T0=273.15,
         V0=253.82,
@@ -132,7 +134,7 @@ def test_process_many_files_mode_2_with_prev_csv(tmp_path):
         data_keys=["x", "y"],
         metadata={},
         n_scan=2
-    )
+    ))
     processor = core.Processor(config)
     processor.process_many_files(list(map(str, DATA_DIR.glob("*.xy"))))
     csv_files = list(tmp_path.glob("*.csv"))
@@ -145,15 +147,16 @@ def test_create_a_server_from_file():
     core.Server.from_file(config_file)
 
 
-def test_vis_server_callbacks(tmp_path):
-    config = core.ProcessorConfig(
+def test_run_calib_2(tmp_path):
+    config = core.Config(processor=core.ProcessorConfig(
         mode=2,
         T0=273.15,
-        V0=253.82,
-        prev_csv=str(DATA_DIR.joinpath("rt_run.csv")),
+        V0=254.713517245,
+        prev_csv=None,
         a_coeffs=[1., 6.55e-6, 1.82e-9],
         b_coeffs=[1., 6.55e-6, 1.82e-9],
         c_coeffs=[1., 6.54e-6, 2.60e-9],
+        n_coeffs=3,
         tc_path="C:\\TOPAS6\\tc.exe",
         inp_path=str(DATA_DIR.joinpath("Al2O3.inp")),
         working_dir=str(tmp_path),
@@ -162,8 +165,10 @@ def test_vis_server_callbacks(tmp_path):
         data_keys=["x", "y"],
         metadata={},
         n_scan=2
-    )
+    ))
     processor = core.Processor(config)
-    processor.subscribe(core.LiveTable(["x", "y", "realVol"]))
-    processor.subscribe(core.FitPlot("I", "Icalc", "tth"))
-    processor.process_many_files(list(map(str, DATA_DIR.glob("*.xy"))))
+    calib_res = processor.run_calib_2(
+        core.FitResult(0.0, 256.067, np.array([0.]), np.array([0.]), np.array([0.]), np.array([0.])),
+        {}
+    )
+    print(calib_res.T)
