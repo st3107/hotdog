@@ -55,6 +55,7 @@ class ProcessorConfig:
     a_coeffs: typing.List = None
     b_coeffs: typing.List = None
     c_coeffs: typing.List = None
+    v_coeffs: typing.List = None
     n_coeffs: int = 3
     tc_path: str = None
     inp_path: str = None
@@ -184,7 +185,7 @@ class Processor(LiveDispatcher):
         self.prev_fit_file: typing.Union[None, pathlib.Path] = None
         coeffs = P.polymul(
             P.polymul(self.config.a_coeffs, self.config.b_coeffs), self.config.c_coeffs
-        )[:self.config.n_coeffs]
+        )[:self.config.n_coeffs] if len(self.config.v_coeffs) > 0 else self.config.v_coeffs
         self.poly = P.Polynomial(coeffs, domain=[-1e5, 1e5], window=[-1e5, 1e5])
         self.stopped = False
         self.original_time = None
@@ -257,13 +258,11 @@ class Processor(LiveDispatcher):
         try:
             self.process_event({"data": data, "descriptor": self.desc_uid})
         except Exception as error:
-            self.emit_stop("fail")
-            self.count = 0
+            self.stop({})
             raise error
         # emit stop if this is the last file
         if self.count >= self.config.n_scan:
-            self.emit_stop("success")
-            self.count = 0
+            self.stop({})
         return
 
     def create_dir(self):
@@ -446,12 +445,12 @@ class Processor(LiveDispatcher):
         self.desc_uid = uid
         return uid
 
-    def emit_stop(self, exit_status: str) -> str:
+    def stop(self, doc, _md=None) -> None:
         uid = bus.new_uid()
-        self.stop({"uid": uid, "exit_status": exit_status})
         self.stopped = True
         self.dump_next_config_file()
-        return uid
+        self.count = 0
+        return super().stop({"uid": uid, "exit_status": "success"})
 
     def dump_next_config_file(self) -> None:
         # dump the config for the next run
