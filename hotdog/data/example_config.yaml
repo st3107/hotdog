@@ -25,7 +25,6 @@ processor:
   - 1.0
   - 6.54e-06
   - 2.6e-09
-  v_coeffs: []
   data_keys:
   - x
   - y
@@ -33,8 +32,8 @@ processor:
   metadata: {}
   mode: 2
   n_coeffs: 3
-  n_scan: 10
+  n_scan: 100000
   prev_csv: ""
   tc_path: C:\TOPAS6\tc.exe
   working_dir: C:\Users\taoso\OneDrive\Documents\outputs
-  xy_file_fmt: '{num1}Al2O3_009_jump_air_t_p1cnt_20190822-132504_Grid_X_{x}_mm_Grid_Y_{y}_mm_eurotherm_{temp}_C_{uid1}_{num2}_dark_corrected_img.xy'
+  xy_file_fmt: '{info1}_Grid_X_{x}_mm_Grid_Y_{y}_mm_{info2}.xy'

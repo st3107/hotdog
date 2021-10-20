@@ -52,10 +52,9 @@ class ProcessorConfig:
     V0: float = 0.
     RT: float = 293.
     prev_csv: typing.Union[None, str] = None
-    a_coeffs: typing.List = None
-    b_coeffs: typing.List = None
-    c_coeffs: typing.List = None
-    v_coeffs: typing.List = None
+    a_coeffs: typing.Union[None, typing.List] = None
+    b_coeffs: typing.Union[None, typing.List] = None
+    c_coeffs: typing.Union[None, typing.List] = None
     n_coeffs: int = 3
     tc_path: str = None
     inp_path: str = None
@@ -185,7 +184,7 @@ class Processor(LiveDispatcher):
         self.prev_fit_file: typing.Union[None, pathlib.Path] = None
         coeffs = P.polymul(
             P.polymul(self.config.a_coeffs, self.config.b_coeffs), self.config.c_coeffs
-        )[:self.config.n_coeffs] if len(self.config.v_coeffs) > 0 else self.config.v_coeffs
+        )[:self.config.n_coeffs]
         self.poly = P.Polynomial(coeffs, domain=[-1e5, 1e5], window=[-1e5, 1e5])
         self.stopped = False
         self.original_time = None
