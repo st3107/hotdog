@@ -57,6 +57,7 @@ class ProcessorConfig:
     c_coeffs: typing.Union[None, typing.List] = None
     n_coeffs: int = 3
     tc_path: str = None
+    sequential_fit: bool = False
     inp_path: str = None
     working_dir: str = None
     xy_file_fmt: str = None
@@ -288,7 +289,7 @@ class Processor(LiveDispatcher):
         fit_file = out_fp.with_suffix(".fit")
         out_file = out_fp.with_suffix(".out")
         # write out the inp file
-        if self.count <= 1:
+        if self.count <= 1 or not self.config.sequential_fit:
             inp_text = self.inp_template
             inp_text = inp_text.replace(
                 "xy_file", str(xy_file)

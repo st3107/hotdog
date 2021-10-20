@@ -29,6 +29,7 @@ processor:
   - x
   - y
   inp_path: C:\Users\taoso\OneDrive\Documents\hotdog\hotdog\data\Al2O3.inp
+  sequential_fit: false
   metadata: {}
   mode: 2
   n_coeffs: 3
