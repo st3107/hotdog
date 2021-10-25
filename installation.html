@@ -45,7 +45,10 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation-from-source">Installation from source</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="release-history.html">Release History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="min_versions.html">Minimum Version of Python and NumPy</a></li>
@@ -77,10 +80,23 @@
              
   <section id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
+<section id="installation-from-source">
+<h2>Installation from source<a class="headerlink" href="#installation-from-source" title="Permalink to this headline">¶</a></h2>
+<p>Require bash shell with <cite>conda</cite> installed.</p>
 <p>At the command line:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pip install hotdog
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">st3107</span><span class="o">/</span><span class="n">hotdog</span><span class="o">.</span><span class="n">git</span><span class="p">;</span>
+<span class="n">conda</span> <span class="n">env</span> <span class="n">create</span> <span class="o">-</span><span class="n">n</span> <span class="n">hotdog</span> <span class="o">-</span><span class="n">f</span> <span class="o">./</span><span class="n">hotdog</span><span class="o">/</span><span class="n">test</span><span class="o">-</span><span class="n">env</span><span class="o">.</span><span class="n">yaml</span>
 </pre></div>
 </div>
+<p>Activate the environment:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">activate</span> <span class="n">hotdog</span>
+</pre></div>
+</div>
+<p>Install the package:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">--</span><span class="n">no</span><span class="o">-</span><span class="n">deps</span> <span class="o">./</span><span class="n">hotdog</span>
+</pre></div>
+</div>
+</section>
 </section>
 
 
