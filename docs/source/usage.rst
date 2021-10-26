@@ -3,8 +3,24 @@ Usage
 =====
 
 
-Use the CLI
------------
+What does it do?
+----------------
+
+The server will process the data files in a stream. The data files are the two column text files of XRD pattern.
+The output files are csv files. The columns are the volume of the cell and the temperature at the point of each
+measurement. The time and other information like horizontal and vertical positions will also be recored if
+specified.
+
+The algorithm is to fit the data using TOPAS and get the volume `Vobs` of the cell. Then, correct the volume
+using `Vreal = alpha * Vobs`. Then, plug it into the equation `Vreal = V0 * polynomial(T - T0)` to calculate the
+temperature `T`.
+
+Here, the `V0` can be directly specified or it can be calculated according to the `Vreal` from a room temperature
+scan. The `alpha` is calculated from the room temperature scan and a data point at the position where the
+calibration is done.
+
+How to use it?
+--------------
 
 Prepare a configuration file. One example file can be found `here <https://github
 .com/st3107/hotdog/blob/main/hotdog/data/example_config.yaml>`_.
