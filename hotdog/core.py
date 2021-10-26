@@ -35,14 +35,23 @@ from hotdog.vend import install_qt_kicker
 logger = logging.getLogger(__name__)
 
 
+class ConfigError(Exception):
+    pass
+
+
 @dataclass
 class ObserverConfig:
-    # TODO: fill in
     watch_path: str = None
     patterns: typing.Union[None, typing.List[str]] = None
     ignore_patterns: typing.Union[None, typing.List[str]] = None
     recursive: bool = True
-    timeout: typing.Union[None, float] = None
+    timeout: typing.Union[None, float, int] = None
+
+    def validate(self) -> None:
+        wp = pathlib.Path(self.watch_path)
+        if not wp.is_dir():
+            raise ConfigError("{} doesn't exist.".format(str(wp)))
+        return
 
 
 @dataclass
@@ -50,11 +59,11 @@ class ProcessorConfig:
     mode: int = 0
     T0: float = 273.15
     V0: float = 0.
-    RT: float = 293.
+    RT: float = 293.15
     prev_csv: typing.Union[None, str] = None
-    a_coeffs: typing.Union[None, typing.List] = None
-    b_coeffs: typing.Union[None, typing.List] = None
-    c_coeffs: typing.Union[None, typing.List] = None
+    a_coeffs: typing.Union[None, typing.List] = dcs.field(default_factory=lambda: [1.])
+    b_coeffs: typing.Union[None, typing.List] = dcs.field(default_factory=lambda: [1.])
+    c_coeffs: typing.Union[None, typing.List] = dcs.field(default_factory=lambda: [1.])
     n_coeffs: int = 3
     tc_path: str = None
     sequential_fit: bool = False
@@ -65,6 +74,44 @@ class ProcessorConfig:
     metadata: typing.Dict[str, float] = None
     n_scan: int = 1
 
+    def validate(self) -> None:
+        if not (0 <= self.mode <= 2):
+            raise ConfigError("The `mode` can only be 0, 1, 2. This is {}.".format(self.mode))
+        if self.V0 < 0.:
+            raise ConfigError("The `V0` can not be negative. This is {}.".format(self.V0))
+        if self.prev_csv:
+            pc = pathlib.Path(self.prev_csv)
+            if not pc.is_file():
+                raise ConfigError("{} doesn't exist.".format(str(pc)))
+        if not self.a_coeffs:
+            raise ConfigError("The `a_coeffs` should at least contain zero order term.")
+        if not self.b_coeffs:
+            raise ConfigError("The `b_coeffs` should at least contain zero order term.")
+        if not self.c_coeffs:
+            raise ConfigError("The `c_coeffs` should at least contain zero order term.")
+        if self.n_coeffs <= 0:
+            raise ConfigError("The `n_coeffs` must be positive number.")
+        order = len(self.a_coeffs) + len(self.b_coeffs) + len(self.c_coeffs) - 3
+        if self.n_coeffs >= order:
+            raise ConfigError(
+                "The `n_coeffs` cannot be larger than the maximum order in polynomial."
+                "This is {} > {}.".format(self.n_coeffs, order)
+            )
+        for attr in [self.tc_path, self.inp_path]:
+            _path = pathlib.Path(attr)
+            if not _path.is_file():
+                raise ConfigError("{} doesn't exist.".format(str(_path)))
+        _path = pathlib.Path(self.working_dir)
+        if not _path.is_dir():
+            raise ConfigError("{} doesn't exist.".format(str(_path)))
+        for dk in self.data_keys:
+            term = "{" + dk + "}"
+            if term not in self.xy_file_fmt:
+                raise ConfigError("The `data_key` {} is not in the `xy_file_fmt`.".format(dk))
+        if self.n_scan <= 0:
+            raise ConfigError("The `n_scan` must be postive. This is {}.".format(self.n_scan))
+        return
+
 
 @dataclass
 class ProxyConfig:
@@ -72,12 +119,20 @@ class ProxyConfig:
     in_port: int = 5567
     out_port: int = 5568
 
+    def validate(self) -> None:
+        return
+
 
 @dataclass
 class Config:
     observer: ObserverConfig = ObserverConfig()
     processor: ProcessorConfig = ProcessorConfig()
     proxy: ProxyConfig = ProxyConfig()
+
+    def validate(self):
+        self.observer.validate()
+        self.processor.validate()
+        self.proxy.validate()
 
 
 @dataclass
@@ -124,6 +179,7 @@ class Server(Observer):
 
     def __init__(self, config: Config):
         super(Server, self).__init__()
+        config.validate()
         self.config = config
         self.handler = Handler(config)
         self.processor = self.handler.processor

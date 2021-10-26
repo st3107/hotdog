@@ -172,3 +172,34 @@ def test_run_calib_2(tmp_path):
         {}
     )
     print(calib_res.T)
+
+
+def test_validate(tmp_path):
+    fake_tc = tmp_path.joinpath("tc.exe")
+    fake_tc.touch()
+    config = core.Config(
+        processor=core.ProcessorConfig(
+            mode=2,
+            T0=273.15,
+            V0=253.82,
+            prev_csv=str(DATA_DIR.joinpath("rt_run.csv")),
+            a_coeffs=[1., 6.55e-6, 1.82e-9],
+            b_coeffs=[1., 6.55e-6, 1.82e-9],
+            c_coeffs=[1., 6.54e-6, 2.60e-9],
+            tc_path=str(fake_tc),
+            inp_path=str(DATA_DIR.joinpath("Al2O3.inp")),
+            working_dir=str(tmp_path),
+            xy_file_fmt=r"{info1}_Grid_X_{x}_mm_Grid_Y_{y}_{info2}.xy",
+            data_keys=["x", "y"],
+            metadata={},
+            n_scan=2
+        ),
+        observer=core.ObserverConfig(
+            watch_path=str(tmp_path),
+            patterns=["*.xy"],
+            ignore_patterns=None,
+            recursive=False,
+            timeout=None
+        )
+    )
+    core.Server(config)
