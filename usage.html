@@ -46,7 +46,11 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Usage</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Usage</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-does-it-do">What does it do?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-to-use-it">How to use it?</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="release-history.html">Release History</a></li>
 <li class="toctree-l1"><a class="reference internal" href="min_versions.html">Minimum Version of Python and NumPy</a></li>
 </ul>
@@ -77,10 +81,46 @@
              
   <section id="usage">
 <h1>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h1>
-<p>Start by importing hotdog.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">hotdog</span>
+<section id="what-does-it-do">
+<h2>What does it do?<a class="headerlink" href="#what-does-it-do" title="Permalink to this headline">¶</a></h2>
+<p>The server will process the data files in a stream. The data files are the two column text files of XRD pattern.
+The output files are csv files. The columns are the volume of the cell and the temperature at the point of each
+measurement. The time and other information like horizontal and vertical positions will also be recored if
+specified.</p>
+<p>The algorithm is to fit the data using TOPAS and get the volume <cite>Vobs</cite> of the cell. Then, correct the volume
+using <cite>Vreal = alpha * Vobs</cite>. Then, plug it into the equation <cite>Vreal = V0 * polynomial(T - T0)</cite> to calculate the
+temperature <cite>T</cite>.</p>
+<p>Here, the <cite>V0</cite> can be directly specified or it can be calculated according to the <cite>Vreal</cite> from a room temperature
+scan. The <cite>alpha</cite> is calculated from the room temperature scan and a data point at the position where the
+calibration is done.</p>
+</section>
+<section id="how-to-use-it">
+<h2>How to use it?<a class="headerlink" href="#how-to-use-it" title="Permalink to this headline">¶</a></h2>
+<p>Prepare a configuration file. One example file can be found <a class="reference external" href="https://github.com/st3107/hotdog/blob/main/hotdog/data/example_config.yaml">here</a>.</p>
+<p>It is a yaml file. If you are not familiar with yaml file. Please read this <a class="reference external" href="https://yaml.org/">website</a>
+. The meaning of the keys are described in the comments in the file.</p>
+<p>Prepare the INP file for the TOPAS. Here is an <a class="reference external" href="https://github.com/st3107/hotdog/blob/main/hotdog/data/Al2O3.inp">example</a>. It must include three words “xy_file”, “res_file”,
+“fit_file”. They will be replaced by the file path for each run.</p>
+<p>Open three bash terminals and conda activate the environment in each of them (here, it is named “hotdog”.):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">activate</span> <span class="n">hotdog</span>
 </pre></div>
 </div>
+<p>In the first terminal, start the data processing server (here, we use “example_config.yaml” as the config file.):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdog</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
+</pre></div>
+</div>
+<p>In the second terminal, start the proxy server:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdogproxy</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
+</pre></div>
+</div>
+<p>In the third terminal, start the data visualization server:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdogvis</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
+</pre></div>
+</div>
+<p>The data processing and saving are done by the first server.The second and the third servers are for the
+visualization.</p>
+<p>If you didn’t see any error messages, the servers have been successfully started.</p>
+</section>
 </section>
 
 
