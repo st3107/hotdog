@@ -175,6 +175,7 @@ class Processor(LiveDispatcher):
         self.inp_template = pathlib.Path(self.config.inp_path).read_text()
         self.working_dir = pathlib.Path(self.config.working_dir)
         self.saving_dir = self.working_dir.joinpath("topas_output_files")
+        self.input_dir = pathlib.Path(self.input_config.observer.watch_path)
         self.tc_path = pathlib.Path(self.config.tc_path)
         self.desc_uid = ""
         self.count = 0
@@ -192,6 +193,7 @@ class Processor(LiveDispatcher):
         self.file_prefix = "{start[uid]}_summary_"
         self.csv_serializer = Serializer(str(self.working_dir), self.file_prefix)
         self.subscribe(self.csv_serializer)
+        self.create_dir()
         self.print("Processor is ready. The data will be output in {}.".format(str(self.working_dir)))
 
     def load_prev_df(self):
@@ -245,7 +247,7 @@ class Processor(LiveDispatcher):
                 }
             )
             self.emit_descriptor()
-            self.create_dir()
+            self.dump_next_config_file()
         # process file
         data = dict()
         raw_data = self.parse_filename(filename)
@@ -265,9 +267,11 @@ class Processor(LiveDispatcher):
             self.stop({})
         return
 
-    def create_dir(self):
-        self.working_dir.mkdir(exist_ok=True)
-        self.saving_dir.mkdir(exist_ok=True)
+    def create_dir(self) -> None:
+        self.working_dir.mkdir(exist_ok=True, parents=True)
+        self.saving_dir.mkdir(exist_ok=True, parents=True)
+        self.input_dir.mkdir(exist_ok=True, parents=True)
+        return
 
     def process_many_files(self, filenames: typing.Iterable[str]) -> None:
         for f in filenames:
@@ -448,7 +452,6 @@ class Processor(LiveDispatcher):
     def stop(self, doc, _md=None) -> None:
         uid = bus.new_uid()
         self.stopped = True
-        self.dump_next_config_file()
         self.count = 0
         return super().stop({"uid": uid, "exit_status": "success"})
 
