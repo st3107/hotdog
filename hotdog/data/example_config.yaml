@@ -1,38 +1,38 @@
-proxy:  # all servers will use this section
+proxy: # all servers will use this section
   host: localhost  # the address of the host for the proxy
   in_port: 5567  # the inbound port
   out_port: 5568  # the outbound port
-observer:  # data processing server will use this section
+observer: # data processing server will use this section
   ignore_patterns: null  # the patterns of the files to ignore
-  patterns:  # the patterns of the files to read when created
-  - '*.xy'
+  patterns: # the patterns of the files to read when created
+    - '*.xy'
   recursive: true  # whether to monitor the folder recursively
   timeout: null  # if time is longer than timeout, terminate the server; if timeout is none, run forever
   watch_path: C:\Users\taoso\OneDrive\Documents\inputs  # the directory to monitor if a data file appears
   # it will be created when the server starts.
-processor:   # data processing server will use this section
+processor: # data processing server will use this section
   RT: 293.15  # the definition of room temperature in K
   T0: 273.15  # the definition of starting point of the temperature. V = V0 * polynomial(T - T0).
   V0: 254.89  # the value of the V at T = T0. Will be used if there is no previous room temperature run.
-  a_coeffs:  # the list of thermal expansion coefficients for lattice a. Starting from zero order term.
-  - 1.0
-  - 6.55e-06
-  - 1.82e-09
-  b_coeffs:  # the list of thermal expansion coefficients for lattice b. Starting from zero order term.
-  - 1.0
-  - 6.55e-06
-  - 1.82e-09
-  c_coeffs:  # the list of thermal expansion coefficients for lattice c. Starting from zero order term.
-  - 1.0
-  - 6.54e-06
-  - 2.6e-09
-  data_keys:  # the name of the data keys to be record. It should appear in xy_file_fmt.
-  - x
-  - y
+  a_coeffs: # the list of thermal expansion coefficients for lattice a. Starting from zero order term.
+    - 1.0
+    - 6.55e-06
+    - 1.82e-09
+  b_coeffs: # the list of thermal expansion coefficients for lattice b. Starting from zero order term.
+    - 1.0
+    - 6.55e-06
+    - 1.82e-09
+  c_coeffs: # the list of thermal expansion coefficients for lattice c. Starting from zero order term.
+    - 1.0
+    - 6.54e-06
+    - 2.6e-09
+  data_keys: # the name of the data keys to be record. It should appear in xy_file_fmt.
+    - x
+    - y
   inp_path: C:\Users\taoso\OneDrive\Documents\hotdog\hotdog\data\Al2O3.inp  # the path to the INP file.
   # the INP file should include three terms "xy_file", "res_file", "fit_file".
   sequential_fit: false  # if true, use the former results as the initial value for the curr fit
-  metadata: {}  # additional metadata to add
+  metadata: { }  # additional metadata to add
   mode: 2  # the mode to run the server.
   # mode 0: room temperature single data point at the position of the calibration. Used to know the real volume.
   # mode 1: room temperature scan. Used to know the alpha, V0 at every position.
