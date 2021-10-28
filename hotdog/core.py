@@ -179,13 +179,13 @@ class Server(Observer):
 
     def __init__(self, config: Config):
         super(Server, self).__init__()
-        config.validate()
         self.config = config
         self.handler = Handler(config)
         self.processor = self.handler.processor
         self.publisher = Publisher((config.proxy.host, config.proxy.in_port))
         self.processor.subscribe(self.publisher)
         self.schedule(self.handler, path=config.observer.watch_path, recursive=config.observer.recursive)
+        self.config.validate()
 
     def run_until_timeout(self):
         timeout = self.config.observer.timeout
@@ -521,6 +521,7 @@ class Processor(LiveDispatcher):
         )
         config_dct["processor"]["prev_csv"] = str(prev_df_path)
         next_config_file = prev_df_path.with_suffix(".yaml")
+        next_config_file.touch(exist_ok=True)
         with next_config_file.open("w") as f:
             yaml.safe_dump(config_dct, f)
         return
