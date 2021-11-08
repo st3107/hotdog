@@ -104,7 +104,7 @@ class ProcessorConfig:
         _path = pathlib.Path(self.working_dir)
         if not _path.is_dir():
             raise ConfigError("{} doesn't exist.".format(str(_path)))
-        for dk in self.data_keys:
+        for dk in self.data_keys + ["time"]:
             term = "{" + dk + "}"
             if term not in self.xy_file_fmt:
                 raise ConfigError("The `data_key` {} is not in the `xy_file_fmt`.".format(dk))
@@ -289,7 +289,6 @@ class Processor(LiveDispatcher):
             The path to the XRD data file.
         """
         _filename = pathlib.Path(filename)
-        self.original_time = _filename.lstat().st_mtime
         self.print("Start processing {}.".format(_filename.name))
         # count
         self.count += 1
@@ -491,11 +490,14 @@ class Processor(LiveDispatcher):
         # parse file name
         xy_file = pathlib.Path(filename)
         dct = isu.reverse_format(xy_file_fmt, xy_file.name)
+        # get the time
+        dt = datetime.strptime(dct["time"], "%y%d%m-%H%M%S")
+        self.original_time = time.mktime(dt.timetuple())
         # split it to data and metadata
         data = dict()
         for key, val in dct.items():
+            val: str
             if key in data_keys:
-                val: str
                 data[key] = float(val.replace(",", "."))
         return data
 
