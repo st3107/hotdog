@@ -47,7 +47,8 @@ setup(
             # 'command = some.module:some_function',
             "hotdog = hotdog.core:hotdog",
             "hotdogvis = hotdog.core:hotdogvis",
-            "hotdogproxy = hotdog.core:hotdogproxy"
+            "hotdogproxy = hotdog.core:hotdogproxy",
+            "hotdogbatch = hotdog.core:hotdogbatch"
         ],
     },
     include_package_data=True,

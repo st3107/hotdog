@@ -10,6 +10,7 @@ import typing
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
+import itertools as it
 
 import bluesky.utils as bus
 import dacite
@@ -231,6 +232,7 @@ class Processor(LiveDispatcher):
         super(Processor, self).__init__()
         self.input_config = config
         self.config = config.processor
+        self.obs_config = config.observer
         self.prev_df = None
         self.load_prev_df()
         self.inp_template = pathlib.Path(self.config.inp_path).read_text()
@@ -333,6 +335,14 @@ class Processor(LiveDispatcher):
     def process_many_files(self, filenames: typing.Iterable[str]) -> None:
         for f in filenames:
             self.process_a_file(f)
+        return
+
+    def process_files_in_dir(self) -> None:
+        _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
+        filenames = it.chain(
+            [_glob(p) for p in self.obs_config.patterns]
+        )
+        self.process_many_files(filenames)
         return
 
     def emit(self, name, doc):
@@ -531,6 +541,17 @@ class Processor(LiveDispatcher):
         with next_config_file.open("w") as f:
             yaml.safe_dump(config_dct, f)
         return
+
+    @classmethod
+    def from_dict(cls, config_dct: dict):
+        config = dacite.from_dict(Config, config_dct)
+        return cls(config)
+
+    @classmethod
+    def from_file(cls, config_file: str):
+        with pathlib.Path(config_file).open("r") as f:
+            dct = yaml.safe_load(f)
+        return cls.from_dict(dct)
 
 
 class VisServer(RemoteDispatcher):
@@ -908,4 +929,14 @@ def run_hotdogproxy(config_file: str) -> None:
 
 def hotdogproxy() -> None:
     fire.Fire(run_hotdogproxy)
+    return
+
+
+def run_hotdogbatch(config_file: str) -> None:
+    processor = Processor.from_file(config_file)
+    processor.process_files_in_dir()
+    return
+
+def hotdogbacth() -> None:
+    fire.Fire(run_hotdogbatch)
     return
