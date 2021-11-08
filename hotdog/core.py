@@ -72,7 +72,6 @@ class ProcessorConfig:
     xy_file_fmt: str = None
     data_keys: typing.List = None
     metadata: typing.Dict[str, float] = None
-    n_scan: int = 1
 
     def validate(self) -> None:
         if not (0 <= self.mode <= 2):
@@ -108,8 +107,6 @@ class ProcessorConfig:
             term = "{" + dk + "}"
             if term not in self.xy_file_fmt:
                 raise ConfigError("The `data_key` {} is not in the `xy_file_fmt`.".format(dk))
-        if self.n_scan <= 0:
-            raise ConfigError("The `n_scan` must be postive. This is {}.".format(self.n_scan))
         return
 
 
@@ -198,6 +195,10 @@ class Server(Observer):
                 time.sleep(1.)
             self.stop()
         except KeyboardInterrupt:
+            # stop the processor
+            if not self.handler.processor.stopped:
+                self.handler.processor.stop({})
+            # stop the server
             self.stop()
         self.join()
 
@@ -317,9 +318,6 @@ class Processor(LiveDispatcher):
         except Exception as error:
             self.stop({})
             raise error
-        # emit stop if this is the last file
-        if self.count >= self.config.n_scan:
-            self.stop({})
         return
 
     def create_dir(self) -> None:
