@@ -103,6 +103,10 @@ class ProcessorConfig:
         _path = pathlib.Path(self.working_dir)
         if not _path.is_dir():
             raise ConfigError("{} doesn't exist.".format(str(_path)))
+        if "filename" in self.data_keys:
+            raise ConfigError("The `filename` is a default data key. Please use another name.")
+        if "time" in self.data_keys:
+            raise ConfigError("The `time` is a default data key. Please use another name")
         for dk in self.data_keys + ["time"]:
             term = "{" + dk + "}"
             if term not in self.xy_file_fmt:
@@ -497,6 +501,8 @@ class Processor(LiveDispatcher):
             val: str
             if key in data_keys:
                 data[key] = float(val.replace(",", "."))
+        # add filename
+        data["filename"] = str(xy_file.stem)
         return data
 
     def emit_descriptor(self) -> str:
