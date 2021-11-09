@@ -111,7 +111,7 @@ class ProcessorConfig:
         for dk in self.data_keys + ["time"]:
             term = "{" + dk + "}"
             if term not in self.xy_file_fmt:
-                raise ConfigError("The `data_key` {} is not in the `xy_file_fmt`.".format(dk))
+                raise ConfigError("The data_key `{}` is not in the `xy_file_fmt`.".format(dk))
         return
 
 
@@ -296,20 +296,9 @@ class Processor(LiveDispatcher):
             The path to the XRD data file.
         """
         _filename = pathlib.Path(filename)
-        self.print("Start processing {}.".format(_filename.name))
+        self.print("Process \"{}\".".format(_filename.name))
         # count
         self.count += 1
-        # emit start if this is the first file
-        if self.count <= 1:
-            self.emit_start(
-                {
-                    "plan_type": "generator",
-                    'plan_name': "hotdog calibration",
-                    "scan_id": 1
-                }
-            )
-            self.emit_descriptor()
-            self.dump_next_config_file()
         # process file
         data = dict()
         raw_data = self.parse_filename(filename)
@@ -318,6 +307,17 @@ class Processor(LiveDispatcher):
         data.update(dcs.asdict(fr))
         cr = self.run_calib(fr, raw_data)
         data.update(dcs.asdict(cr))
+        # emit start if this is the first file
+        if self.count <= 1:
+            uid = self.emit_start(
+                {
+                    "plan_type": "generator",
+                    'plan_name': "hotdog calibration",
+                    "scan_id": 1
+                }
+            )
+            self.emit_descriptor()
+            self.dump_next_config_file()
         # emit event data
         try:
             self.process_event({"data": data, "descriptor": self.desc_uid})
@@ -340,9 +340,10 @@ class Processor(LiveDispatcher):
     def process_files_in_dir(self) -> None:
         _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
         filenames = it.chain(
-            [_glob(p) for p in self.obs_config.patterns]
+            *(_glob(p) for p in self.obs_config.patterns)
         )
         self.process_many_files(filenames)
+        self.stop({})
         return
 
     def emit(self, name, doc):
@@ -503,7 +504,7 @@ class Processor(LiveDispatcher):
         xy_file = pathlib.Path(filename)
         dct = isu.reverse_format(xy_file_fmt, xy_file.name)
         # get the time
-        dt = datetime.strptime(dct["time"], "%y%d%m-%H%M%S")
+        dt = datetime.strptime(dct["time"], "%Y%m%d-%H%M%S")
         self.original_time = time.mktime(dt.timetuple())
         # split it to data and metadata
         data = dict()
@@ -934,9 +935,12 @@ def hotdogproxy() -> None:
 
 def run_hotdogbatch(config_file: str) -> None:
     processor = Processor.from_file(config_file)
+    processor.config.validate()
+    processor.obs_config.validate()
     processor.process_files_in_dir()
     return
 
-def hotdogbacth() -> None:
+
+def hotdogbatch() -> None:
     fire.Fire(run_hotdogbatch)
     return

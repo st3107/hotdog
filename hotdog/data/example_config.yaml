@@ -38,10 +38,9 @@ processor: # data processing server will use this section
   # mode 1: room temperature scan. Used to know the alpha, V0 at every position.
   # mode 2: high temperature scan. Used to calculate the temperature at every position.
   n_coeffs: 3  # the order of polynomial to use in the V = V0 * polynomial(T - T0).
-  n_scan: 100000  # the number of the scan. the server will be terminated after the last scan.
   prev_csv: ""  # the previous result csv file to use for alpha and V0.
   tc_path: C:\TOPAS6\tc.exe  # the path to the TOPAS executable file.
   working_dir: C:\Users\taoso\OneDrive\Documents\outputs  # the directory of the output files.
   # it will be created when the server starts.
-  xy_file_fmt: '{info1}_Grid_X_{x}_mm_Grid_Y_{y}_mm_{info2}.xy'  # the format of the file name.
+  xy_file_fmt: '{info1}_100p_{time}_Grid_X_{x}_mm_Grid_Y_{y}_mm_{info2}.xy'  # the format of the file name.
   # the changing part should be in brackets. the data specified by the data_keys will be recorded.
