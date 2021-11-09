@@ -20,3 +20,14 @@ Install the package::
 
     pip install -e --no-deps ./hotdog
 
+
+
+Update the package
+------------------
+
+If you have already installed the package but didn't get the latest version, please open a terminal and run::
+
+    cd hotdog
+    git pull origin main
+
+Please change the `hotdog` here to the path to the hotdog folder on your machine.
