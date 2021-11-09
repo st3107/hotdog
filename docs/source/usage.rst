@@ -22,7 +22,7 @@ calibration is done.
 How to use it?
 --------------
 
-Prepare a configuration file. One example file can be found `here <https://github
+Prepare a configuration file in current working directory. One example file can be found `here <https://github
 .com/st3107/hotdog/blob/main/hotdog/data/example_config.yaml>`_.
 
 It is a yaml file. If you are not familiar with yaml file. Please read this `website <https://yaml.org/>`_
@@ -52,3 +52,29 @@ The data processing and saving are done by the first server.The second and the t
 visualization.
 
 If you didn't see any error messages, the servers have been successfully started.
+
+
+How to use it after the collection?
+-----------------------------------
+
+If we already have a folder with all the data files inside, we cann run the `hotdogbatch` to process them. It requires
+the same configuration file as the hotdog.
+
+Open three bash terminals and conda activate the environment in each of them (here, it is named "hotdog".)::
+
+    conda activate hotdog
+
+
+If you would like the streaming visualization during the data processing, start the proxy::
+
+    hotdogproxy example_config.yaml
+
+Then, start the visualization server::
+
+    hotdogvis example_config.yaml
+
+Finally, run the command::
+
+    hotdogbatch example_config.yaml
+
+
