@@ -49,6 +49,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Usage</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#what-does-it-do">What does it do?</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#how-to-use-it">How to use it?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-to-use-it-after-the-collection">How to use it after the collection?</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="release-history.html">Release History</a></li>
@@ -96,7 +97,7 @@ calibration is done.</p>
 </section>
 <section id="how-to-use-it">
 <h2>How to use it?<a class="headerlink" href="#how-to-use-it" title="Permalink to this headline">¶</a></h2>
-<p>Prepare a configuration file. One example file can be found <a class="reference external" href="https://github.com/st3107/hotdog/blob/main/hotdog/data/example_config.yaml">here</a>.</p>
+<p>Prepare a configuration file in current working directory. One example file can be found <a class="reference external" href="https://github.com/st3107/hotdog/blob/main/hotdog/data/example_config.yaml">here</a>.</p>
 <p>It is a yaml file. If you are not familiar with yaml file. Please read this <a class="reference external" href="https://yaml.org/">website</a>
 . The meaning of the keys are described in the comments in the file.</p>
 <p>Prepare the INP file for the TOPAS. Here is an <a class="reference external" href="https://github.com/st3107/hotdog/blob/main/hotdog/data/Al2O3.inp">example</a>. It must include three words “xy_file”, “res_file”,
@@ -120,6 +121,27 @@ calibration is done.</p>
 <p>The data processing and saving are done by the first server.The second and the third servers are for the
 visualization.</p>
 <p>If you didn’t see any error messages, the servers have been successfully started.</p>
+</section>
+<section id="how-to-use-it-after-the-collection">
+<h2>How to use it after the collection?<a class="headerlink" href="#how-to-use-it-after-the-collection" title="Permalink to this headline">¶</a></h2>
+<p>If we already have a folder with all the data files inside, we cann run the <cite>hotdogbatch</cite> to process them. It requires
+the same configuration file as the hotdog.</p>
+<p>Open three bash terminals and conda activate the environment in each of them (here, it is named “hotdog”.):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">activate</span> <span class="n">hotdog</span>
+</pre></div>
+</div>
+<p>If you would like the streaming visualization during the data processing, start the proxy:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdogproxy</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
+</pre></div>
+</div>
+<p>Then, start the visualization server:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdogvis</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
+</pre></div>
+</div>
+<p>Finally, run the command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdogbatch</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
+</pre></div>
+</div>
 </section>
 </section>
 
