@@ -18,7 +18,7 @@ Activate the environment::
 
 Install the package::
 
-    pip install -e --no-deps ./hotdog
+    pip install -e ./hotdog
 
 
 
@@ -29,5 +29,6 @@ If you have already installed the package but didn't get the latest version, ple
 
     cd hotdog
     git pull origin main
+    pip install -e ./hotdog
 
 Please change the `hotdog` here to the path to the hotdog folder on your machine.
