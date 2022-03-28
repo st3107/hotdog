@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import itertools as it
 
+import tqdm
 import bluesky.utils as bus
 import dacite
 import fire
@@ -73,16 +74,17 @@ class ProcessorConfig:
     xy_file_fmt: str = None
     data_keys: typing.List = None
     metadata: typing.Dict[str, float] = None
+    tolerance: float = 1e-4  # in what range two points are considered the same
+    is_test: bool = False
+    progress_bar: bool = True
 
     def validate(self) -> None:
         if not (0 <= self.mode <= 2):
             raise ConfigError("The `mode` can only be 0, 1, 2. This is {}.".format(self.mode))
         if self.V0 < 0.:
             raise ConfigError("The `V0` can not be negative. This is {}.".format(self.V0))
-        if self.prev_csv:
-            pc = pathlib.Path(self.prev_csv)
-            if not pc.is_file():
-                raise ConfigError("{} doesn't exist.".format(str(pc)))
+        if not self.prev_csv:
+            raise ConfigError("The `prev_csv` should be provided.")
         if not self.a_coeffs:
             raise ConfigError("The `a_coeffs` should at least contain zero order term.")
         if not self.b_coeffs:
@@ -136,6 +138,25 @@ class Config:
         self.processor.validate()
         self.proxy.validate()
 
+    @classmethod
+    def from_dict(cls, config_dct: dict):
+        return dacite.from_dict(cls, config_dct)
+
+    @classmethod
+    def from_file(cls, config_file: str):
+        with pathlib.Path(config_file).open("r") as f:
+            config_dct = yaml.safe_load(f)
+        return cls.from_dict(config_dct)
+
+    def to_dict(self) -> dict:
+        return dcs.asdict(self)
+
+    def to_yaml(self, yaml_file: str) -> None:
+        yaml_file = str(pathlib.PurePath(yaml_file))
+        dct = self.to_dict()
+        with pathlib.Path(yaml_file).open("w") as f:
+            yaml.safe_dump(dct, f)
+        return
 
 @dataclass
 class FitResult:
@@ -173,7 +194,7 @@ class Handler(PatternMatchingEventHandler):
 
     def on_any_event(self, event):
         if isinstance(event, FileCreatedEvent):
-            self.processor.process_a_file(str(event.src_path))
+            self.processor._process_a_file(str(event.src_path))
 
 
 class Server(Observer):
@@ -196,29 +217,28 @@ class Server(Observer):
         self.start()
         t0 = time.time()
         try:
-            while time.time() - t0 <= timeout and not self.handler.processor.stopped:
+            while ((time.time() - t0) <= timeout) and (not self.handler.processor.stopped):
                 time.sleep(1.)
             self.stop()
         except KeyboardInterrupt:
             # stop the processor
             if not self.handler.processor.stopped:
-                self.handler.processor.stop({})
+                self.handler.processor.stop_and_reset()
             # stop the server
             self.stop()
         self.join()
 
     @classmethod
     def from_dict(cls, config_dct: dict):
-        config = dacite.from_dict(Config, config_dct)
+        config = Config.from_dict(config_dct)
         return cls(config)
 
     @classmethod
     def from_file(cls, config_file: str):
-        with pathlib.Path(config_file).open("r") as f:
-            dct = yaml.safe_load(f)
-        return cls.from_dict(dct)
+        config = Config.from_file(config_file)
+        return cls.from_dict(config)
 
-    def dump_config(self, config_file: str) -> None:
+    def _dump_config(self, config_file: str) -> None:
         dct = dcs.asdict(self.config)
         with pathlib.Path(config_file).open("w") as f:
             yaml.safe_dump(dct, f)
@@ -233,8 +253,7 @@ class Processor(LiveDispatcher):
         self.input_config = config
         self.config = config.processor
         self.obs_config = config.observer
-        self.prev_df = None
-        self.load_prev_df()
+        self.prev_df = self._load_prev_df()
         self.inp_template = pathlib.Path(self.config.inp_path).read_text()
         self.working_dir = pathlib.Path(self.config.working_dir)
         self.saving_dir = self.working_dir.joinpath("topas_output_files")
@@ -254,38 +273,46 @@ class Processor(LiveDispatcher):
         self.stopped = False
         self.original_time = None
         self.file_prefix = "{start[uid]}_summary_"
-        self.csv_serializer = Serializer(str(self.working_dir), self.file_prefix)
-        self.subscribe(self.csv_serializer)
-        self.create_dir()
-        self.print("Processor is ready. The data will be output in {}.".format(str(self.working_dir)))
+        self._create_dir()
+        self._print("Processor is ready. The data will be output in {}.".format(str(self.working_dir)))
 
-    def load_prev_df(self):
-        if self.config.mode == 0:
-            if self.config.prev_csv:
-                self.print(
-                    "WARNING: This is the first run. "
-                    "The previous csv file is not need."
-                )
-        elif self.config.mode == 1:
-            if not self.config.prev_csv:
-                self.print(
-                    "WARNING: Missing the data from the previous run. "
-                    "Use alpha = 1., T = {} at room temperature.".format(self.config.RT)
-                )
-            else:
-                self.prev_df = pd.read_csv(self.config.prev_csv)
-        elif self.config.mode == 2:
-            if not self.config.prev_csv:
-                self.print(
-                    "WARNING: Missing the data from the previous run. "
-                    "The volume correction will be skipped. "
-                    "The T0 and V0 in configuration file will be used."
-                )
-            else:
-                self.prev_df = pd.read_csv(self.config.prev_csv)
+    def process_files_in_dir(self) -> None:
+        filenames = self._get_file_names()
+        filenames = tqdm.tqdm(filenames, disable=(not self.config.progress_bar))
+        self._process_many_files(filenames)
         return
 
-    def process_a_file(self, filename: str) -> None:
+    def _get_file_names(self) -> typing.List[pathlib.Path]:
+        _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
+        filenames = list(it.chain(*(_glob(p) for p in self.obs_config.patterns)))
+        if not filenames:
+            raise ProcessorError(
+                "Cannot find any files matched to the patterns in '{}'.".format(self.input_dir.absolute())
+            )
+        return filenames
+
+    def _load_prev_df(self) -> pd.DataFrame:
+        csv_path = pathlib.Path(self.config.prev_csv)
+        if not csv_path.is_file():
+            df = pd.DataFrame()
+            df.to_csv(str(csv_path))
+            return df
+        return pd.read_csv(str(csv_path), error_bad_lines=False)
+
+    def _save_data(self, data: dict) -> None:
+        new_df = pd.DataFrame(data)
+        new_df.to_csv(
+            self.config.prev_csv,
+            mode='a'
+        )
+        self.prev_df = pd.concat(
+            (self.prev_df, new_df),
+            ignore_index=True,
+            copy=False
+        )
+        return
+
+    def _process_a_file(self, filename: str) -> None:
         """Process the XRD data file and output the documents of the results.
 
         The fitted data file and result csv file will be generated in the process.
@@ -296,61 +323,54 @@ class Processor(LiveDispatcher):
             The path to the XRD data file.
         """
         _filename = pathlib.Path(filename)
-        self.print("Process \"{}\".".format(_filename.name))
+        self._print("Process \"{}\".".format(_filename.name))
         # count
         self.count += 1
         # process file
         data = dict()
-        raw_data = self.parse_filename(filename)
+        raw_data = self._parse_filename(str(_filename))
         data.update(raw_data)
-        fr = self.run_topas(filename)
+        fr = self._run_topas(str(_filename))
         data.update(dcs.asdict(fr))
-        cr = self.run_calib(fr, raw_data)
+        cr = self._run_calib(fr, raw_data)
         data.update(dcs.asdict(cr))
+        # add file name
+        data["filename"] = _filename.stem
+        # save the data in file and memory
+        self._save_data(data)
         # emit start if this is the first file
         if self.count <= 1:
-            uid = self.emit_start(
-                {
-                    "plan_type": "generator",
-                    'plan_name': "hotdog calibration",
-                    "scan_id": 1
-                }
-            )
-            self.emit_descriptor()
-            self.dump_next_config_file()
+            self._emit_start()
+            self._emit_descriptor()
         # emit event data
-        try:
-            self.process_event({"data": data, "descriptor": self.desc_uid})
-        except Exception as error:
-            self.stop({})
-            raise error
+        self.process_event({"data": data, "descriptor": self.desc_uid})
         return
 
-    def create_dir(self) -> None:
+    def _create_dir(self) -> None:
         self.working_dir.mkdir(exist_ok=True, parents=True)
         self.saving_dir.mkdir(exist_ok=True, parents=True)
         self.input_dir.mkdir(exist_ok=True, parents=True)
         return
 
-    def process_many_files(self, filenames: typing.Iterable[str]) -> None:
+    def _process_many_files(self, filenames: typing.Iterable[str]) -> None:
+        count = 0
         for f in filenames:
-            self.process_a_file(f)
-        return
-
-    def process_files_in_dir(self) -> None:
-        _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
-        filenames = it.chain(
-            *(_glob(p) for p in self.obs_config.patterns)
-        )
-        self.process_many_files(filenames)
-        self.stop({})
+            self._process_a_file(f)
+            count += 1
+        if count > 0:
+            self.stop_and_reset()
         return
 
     def emit(self, name, doc):
         doc["time"] = self.original_time
         return super(Processor, self).emit(name, doc)
 
-    def run_topas(self, filename: str) -> FitResult:
+    def _run_topas(self, filename: str) -> FitResult:
+        # if it is a test, return a fake result
+        if self.config.is_test:
+            a_zero = np.array([0.])
+            a_one = np.array([1.])
+            return FitResult(0.0, 1.0, a_zero, a_one, a_one, a_zero)
         wd = self.saving_dir
         tc_path = self.tc_path
         # get all file paths
@@ -420,24 +440,21 @@ class Processor(LiveDispatcher):
         self.prev_res_file = res_file
         return FitResult(Rwp=res[0], Vol=res[1], tth=fit[0], I=fit[1], Icalc=fit[2], Idiff=fit[3])
 
-    def run_calib(self, fitresult: FitResult, raw_data: dict) -> CalibResult:
-        mode = self.config.mode
-        if mode == 0:
+    def _run_calib(self, fitresult: FitResult, raw_data: dict) -> CalibResult:
+        if self.prev_df.empty:
             # Record the V0, T0
-            return self.run_calib_0(fitresult)
-        elif mode == 1:
+            return self._run_calib_0(fitresult)
+        idx = self._get_index(raw_data)
+        if idx < 0:
             # Calculate the correction parameter
-            return self.run_calib_1(fitresult)
-        elif mode == 2:
-            # Calculate the real volume and temperature
-            return self.run_calib_2(fitresult, raw_data)
-        else:
-            raise ValueError("Unknown mode: {}. Require mode in 0, 1, 2.".format(mode))
+            return self._run_calib_1(fitresult)
+        # Calculate the real volume and temperature
+        return self._run_calib_2(fitresult, idx)
 
-    def run_calib_0(self, fitresult: FitResult) -> CalibResult:
+    def _run_calib_0(self, fitresult: FitResult) -> CalibResult:
         return CalibResult(1., fitresult.Vol, self.config.RT)
 
-    def run_calib_1(self, fitresult: FitResult) -> CalibResult:
+    def _run_calib_1(self, fitresult: FitResult) -> CalibResult:
         if self.prev_df is None:
             realVol = fitresult.Vol
             alpha = 1.
@@ -448,14 +465,14 @@ class Processor(LiveDispatcher):
             T = self.prev_df["T"][0]
         return CalibResult(alpha, realVol, T)
 
-    def run_calib_2(self, fitresult: FitResult, raw_data: dict) -> CalibResult:
+    def _run_calib_2(self, fitresult: FitResult, prev_idx: int) -> CalibResult:
         T0 = self.config.T0
         if self.prev_df is None:
             V0 = self.config.V0
             realVol = fitresult.Vol
             alpha = 1.
         else:
-            cr0 = self._get_prev_result(raw_data)
+            cr0 = self._get_prev_result(prev_idx)
             alpha = cr0.alpha
             realVol = alpha * fitresult.Vol
             c = self.poly(np.array([cr0.T - T0]))[0]
@@ -467,25 +484,39 @@ class Processor(LiveDispatcher):
         T = fsolve(func, np.array([400.]), xtol=1e-4)[0] + T0
         return CalibResult(alpha, realVol, T)
 
-    def _get_prev_result(self, raw_data: dict) -> CalibResult:
+    def _get_index(self, raw_data: dict) -> int:
         keys = list(raw_data.keys())
         sel_prev_df: pd.DataFrame = self.prev_df[keys]
         raw_sr = pd.Series(raw_data)
-        dist = (sel_prev_df - raw_sr).pow(2).sum(axis=1)
+        dist = np.sqrt((sel_prev_df - raw_sr).pow(2).sum(axis=1))
         idx = dist.argmin()
-        if idx < 0 or idx > sel_prev_df.shape[0] - 1:
-            raise ProcessorError("Cannot find the closest value in previous dataframe.")
+        if not (-1 < idx < self.prev_df.shape[0]):
+            return -2
+        if dist[idx] > self.config.tolerance:
+            return -1
+        return idx
+
+    def _get_prev_result(self, idx: int) -> CalibResult:
         row = self.prev_df.iloc[idx][self.fields]
         return CalibResult(**row.to_dict())
 
     @staticmethod
-    def print(message: str):
+    def _print(message: str):
         now = datetime.now()
         dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
         text = "[{}] {}".format(dt_string, message)
         return print(text)
 
-    def emit_start(self, meta: dict) -> str:
+    def _emit_start(self, meta: typing.Optional[dict] = None) -> None:
+        if meta is None:
+            meta = {}
+        meta.update(
+            {
+                "plan_type": "generator",
+                "plan_name": "hotdog calibration",
+                "scan_id": 1
+            }
+        )
         user_meta = self.config.metadata
         dks = self.config.data_keys
         if user_meta is None:
@@ -494,10 +525,9 @@ class Processor(LiveDispatcher):
         doc = dict(**meta, **user_meta)
         doc["uid"] = uid
         doc["hints"] = {'dimensions': [([dk], 'primary') for dk in dks]}
-        self.start(doc)
-        return uid
+        return super().start(doc)
 
-    def parse_filename(self, filename: str) -> dict:
+    def _parse_filename(self, filename: str) -> dict:
         xy_file_fmt = self.config.xy_file_fmt
         data_keys = self.config.data_keys
         # parse file name
@@ -512,23 +542,21 @@ class Processor(LiveDispatcher):
             val: str
             if key in data_keys:
                 data[key] = float(val.replace(",", "."))
-        # add filename
-        data["filename"] = str(xy_file.stem)
         return data
 
-    def emit_descriptor(self) -> str:
+    def _emit_descriptor(self) -> None:
         uid = bus.new_uid()
-        self.descriptor({"uid": uid, "data_keys": {}, "name": "primary"})
+        super().descriptor({"uid": uid, "data_keys": {}, "name": "primary"})
         self.desc_uid = uid
-        return uid
+        return
 
-    def stop(self, doc, _md=None) -> None:
+    def stop_and_reset(self) -> None:
         uid = bus.new_uid()
         self.stopped = True
         self.count = 0
         return super().stop({"uid": uid, "exit_status": "success"})
 
-    def dump_next_config_file(self) -> None:
+    def _dump_next_config_file(self) -> None:
         # dump the config for the next run
         config_dct = dcs.asdict(self.input_config)
         if self.config.mode < 2:
@@ -589,16 +617,15 @@ class VisServer(RemoteDispatcher):
 
     @classmethod
     def from_dict(cls, config_dct: dict):
-        config = dacite.from_dict(Config, config_dct)
+        config = Config.from_dict(config_dct)
         return cls(config)
 
     @classmethod
     def from_file(cls, config_file: str):
-        with pathlib.Path(config_file).open("r") as f:
-            dct = yaml.safe_load(f)
-        return cls.from_dict(dct)
+        config = Config.from_file(config_file)
+        return cls.from_dict(config)
 
-    def dump_config(self, config_file: str) -> None:
+    def _dump_config(self, config_file: str) -> None:
         dct = dcs.asdict(self.config)
         with pathlib.Path(config_file).open("w") as f:
             yaml.safe_dump(dct, f)
@@ -944,3 +971,6 @@ def run_hotdogbatch(config_file: str) -> None:
 def hotdogbatch() -> None:
     fire.Fire(run_hotdogbatch)
     return
+
+
+#TODO: a function to start two servers in two thread at once
