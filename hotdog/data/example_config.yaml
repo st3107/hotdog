@@ -12,8 +12,6 @@ observer: # data processing server will use this section
   # it will be created when the server starts.
 processor: # data processing server will use this section
   RT: 293.15  # the definition of room temperature in K
-  T0: 273.15  # the definition of starting point of the temperature. V = V0 * polynomial(T - T0).
-  V0: 254.89  # the value of the V at T = T0. Will be used if there is no previous room temperature run.
   a_coeffs: # the list of thermal expansion coefficients for lattice a. Starting from zero order term.
     - 1.0
     - 6.55e-06
@@ -27,20 +25,20 @@ processor: # data processing server will use this section
     - 6.54e-06
     - 2.6e-09
   data_keys: # the name of the data keys to be record. It should appear in xy_file_fmt.
-    - x
-    - y
+    - "x"
+    - "y"
   inp_path: C:\Users\taoso\OneDrive\Documents\hotdog\hotdog\data\Al2O3.inp  # the path to the INP file.
   # the INP file should include three terms "xy_file", "res_file", "fit_file".
   sequential_fit: false  # if true, use the former results as the initial value for the curr fit
   metadata: { }  # additional metadata to add
-  mode: 2  # the mode to run the server.
   # mode 0: room temperature single data point at the position of the calibration. Used to know the real volume.
   # mode 1: room temperature scan. Used to know the alpha, V0 at every position.
   # mode 2: high temperature scan. Used to calculate the temperature at every position.
   n_coeffs: 3  # the order of polynomial to use in the V = V0 * polynomial(T - T0).
-  prev_csv: ""  # the previous result csv file to use for alpha and V0.
+  prev_csv: "./hoddog_data.csv"  # the previous result csv file to use for alpha and V0.
   tc_path: C:\TOPAS6\tc.exe  # the path to the TOPAS executable file.
   working_dir: C:\Users\taoso\OneDrive\Documents\outputs  # the directory of the output files.
   # it will be created when the server starts.
   xy_file_fmt: '{info1}_100p_{time}_Grid_X_{x}_mm_Grid_Y_{y}_mm_{info2}.xy'  # the format of the file name.
   # the changing part should be in brackets. the data specified by the data_keys will be recorded.
+  tolerance: 1.0e-04  # the largest distances between two points that can be considered as the same point
