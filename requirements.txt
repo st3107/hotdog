@@ -1,1 +1,12 @@
 # List required packages in this file, one per line.
+pip
+dacite
+bluesky
+fire
+scipy
+watchdog
+suitcase-csv
+pandas
+numpy
+tqdm
+intake

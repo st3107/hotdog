@@ -9,6 +9,6 @@ DATA_DIR = pathlib.Path(resource_filename("hotdog", "data"))
 CONFIG_FILE = DATA_DIR.joinpath("example_config.yaml")
 
 
-# @pytest.mark.skip
+@pytest.mark.skip
 def test_run_hotdogbatch():
     core.run_hotdogbatch(str(CONFIG_FILE))
