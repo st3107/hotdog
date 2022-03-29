@@ -1,4 +1,5 @@
 from tkinter.tix import Tree
+import pandas as pd
 import pytest
 import pathlib
 import shutil
@@ -36,6 +37,7 @@ def ready_config(tmp_path: pathlib.Path) -> core.Config:
     return config
 
 
+# FIXME: the csv file doesn't output the correct content
 def test_Processor(ready_config: core.Config):
     config = ready_config
     db = Broker.named("temp").v2
@@ -52,4 +54,9 @@ def test_Processor(ready_config: core.Config):
     expect_data_keys = extracted_keys + calib_result_keys + fit_result_keys + other_keys
     for key in expect_data_keys:
         assert key in output_data_keys
-    
+    df: pd.DataFrame = pd.read_csv(config.processor.prev_csv, index_col=0)
+    assert not df.empty
+    columns = set(df.columns)
+    expect_columns = set(expect_data_keys).difference({"Idiff", "Icalc", "I", "tth"})
+    for col in expect_columns:
+        assert col in columns
