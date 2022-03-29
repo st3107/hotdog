@@ -11,6 +11,7 @@ import warnings
 from dataclasses import dataclass
 from datetime import datetime
 import itertools as it
+from setuptools_scm import meta
 
 import tqdm
 import bluesky.utils as bus
@@ -34,8 +35,13 @@ from watchdog.observers import Observer
 
 from hotdog.vend import install_qt_kicker
 
+# logger for the plotting functions
 logger = logging.getLogger(__name__)
-
+# type alias
+AnyData = typing.Dict[str, float]
+MetaData = typing.Dict[str, typing.Any]
+RawData = typing.Dict[str, float]
+ParsedData = typing.Tuple[RawData, MetaData]
 
 class ConfigError(Exception):
     pass
@@ -298,8 +304,8 @@ class Processor(LiveDispatcher):
             return df
         return pd.read_csv(str(csv_path), error_bad_lines=False)
 
-    def _save_data(self, data: dict) -> None:
-        new_df = pd.DataFrame(data)
+    def _save_data(self, data: AnyData, metadata: MetaData) -> None:
+        new_df = pd.DataFrame(dict(**data, **metadata))
         csv_path = pathlib.Path(self.config.prev_csv)
         if self.count == 1 and not csv_path.is_file():
             new_df.to_csv(str(csv_path), mode='w', header=True)
@@ -324,16 +330,14 @@ class Processor(LiveDispatcher):
         self.count += 1
         # process file
         data = dict()
-        raw_data = self._parse_filename(str(_filename))
+        raw_data, metadata = self._parse_filename(str(_filename))
         data.update(raw_data)
         fr = self._run_topas(str(_filename))
         data.update(dcs.asdict(fr))
         cr = self._run_calib(fr, raw_data)
         data.update(dcs.asdict(cr))
-        # add file name
-        data["filename"] = _filename.stem
         # save the data in file and memory
-        self._save_data(data)
+        self._save_data(data, metadata)
         # emit start if this is the first file
         if self.count == 1:
             self._emit_start()
@@ -437,7 +441,7 @@ class Processor(LiveDispatcher):
         self.prev_res_file = res_file
         return FitResult(Rwp=res[0], Vol=res[1], tth=fit[0], I=fit[1], Icalc=fit[2], Idiff=fit[3])
 
-    def _run_calib(self, fitresult: FitResult, raw_data: dict) -> CalibResult:
+    def _run_calib(self, fitresult: FitResult, raw_data: RawData) -> CalibResult:
         if self.prev_df.empty:
             # Record the V0, T0
             return self._run_calib_0(fitresult)
@@ -524,7 +528,7 @@ class Processor(LiveDispatcher):
         doc["hints"] = {'dimensions': [([dk], 'primary') for dk in dks]}
         return super().start(doc)
 
-    def _parse_filename(self, filename: str) -> dict:
+    def _parse_filename(self, filename: str) -> ParsedData:
         xy_file_fmt = self.config.xy_file_fmt
         data_keys = self.config.data_keys
         # parse file name
@@ -539,7 +543,12 @@ class Processor(LiveDispatcher):
             val: str
             if key in data_keys:
                 data[key] = float(val.replace(",", "."))
-        return data
+        # get metadata
+        metadata= {
+            "filename": xy_file.stem,
+            "time": dt
+        }
+        return data, metadata
 
     def _emit_descriptor(self) -> None:
         uid = bus.new_uid()
