@@ -1,6 +1,7 @@
 import collections
 import dataclasses
 import dataclasses as dcs
+import itertools as it
 import logging
 import pathlib
 import subprocess
@@ -10,10 +11,7 @@ import typing
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
-import itertools as it
-from setuptools_scm import meta
 
-import tqdm
 import bluesky.utils as bus
 import dacite
 import fire
@@ -21,16 +19,16 @@ import intake.source.utils as isu
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import tqdm
 import yaml
-from bluesky.callbacks.core import get_obj_fields, make_class_safe, LiveTable
-from bluesky.callbacks.mpl_plotting import LivePlot, LiveScatter
-from bluesky.callbacks.mpl_plotting import QtAwareCallback
+from bluesky.callbacks.core import LiveTable, get_obj_fields, make_class_safe
+from bluesky.callbacks.mpl_plotting import (LivePlot, LiveScatter,
+                                            QtAwareCallback)
 from bluesky.callbacks.stream import LiveDispatcher
-from bluesky.callbacks.zmq import RemoteDispatcher, Publisher, Proxy
+from bluesky.callbacks.zmq import Proxy, Publisher, RemoteDispatcher
 from numpy.polynomial import polynomial as P
 from scipy.optimize import fsolve
-from suitcase.csv import Serializer
-from watchdog.events import PatternMatchingEventHandler, FileCreatedEvent
+from watchdog.events import FileCreatedEvent, PatternMatchingEventHandler
 from watchdog.observers import Observer
 
 from hotdog.vend import install_qt_kicker
@@ -42,6 +40,7 @@ AnyData = typing.Dict[str, float]
 MetaData = typing.Dict[str, typing.Any]
 RawData = typing.Dict[str, float]
 ParsedData = typing.Tuple[RawData, MetaData]
+
 
 class ConfigError(Exception):
     pass
@@ -163,6 +162,7 @@ class Config:
         with pathlib.Path(yaml_file).open("w") as f:
             yaml.safe_dump(dct, f)
         return
+
 
 @dataclass
 class FitResult:
@@ -544,7 +544,7 @@ class Processor(LiveDispatcher):
             if key in data_keys:
                 data[key] = float(val.replace(",", "."))
         # get metadata
-        metadata= {
+        metadata = {
             "filename": xy_file.stem,
             "time": dt
         }

@@ -1,15 +1,13 @@
-from tkinter.tix import Tree
-import pandas as pd
-import pytest
 import pathlib
 import shutil
-import xarray as xr
-
-from databroker import Broker
 from dataclasses import fields
-from pkg_resources import resource_filename
 
 import hotdog.core as core
+import pandas as pd
+import pytest
+import xarray as xr
+from databroker import Broker
+from pkg_resources import resource_filename
 
 _DATA_DIR = pathlib.Path(resource_filename("hotdog", "data"))
 
