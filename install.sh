@@ -1,7 +1,7 @@
 #!/bin/bash
 
-env="${1:-hotdog}"
-mode="${2:-user}"
+env="${env:-hotdog}"
+mode="${mode:-user}"
 
 echo "Start creating conda environment '$env'."
 conda create -n "$env" --yes
