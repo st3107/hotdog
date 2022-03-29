@@ -242,7 +242,7 @@ class Server(Observer):
     @classmethod
     def from_file(cls, config_file: str):
         config = Config.from_file(config_file)
-        return cls.from_dict(config)
+        return cls(config)
 
     def _dump_config(self, config_file: str) -> None:
         dct = dcs.asdict(self.config)
@@ -630,7 +630,7 @@ class VisServer(RemoteDispatcher):
     @classmethod
     def from_file(cls, config_file: str):
         config = Config.from_file(config_file)
-        return cls.from_dict(config)
+        return cls(config)
 
     def _dump_config(self, config_file: str) -> None:
         dct = dcs.asdict(self.config)

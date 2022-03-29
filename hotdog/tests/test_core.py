@@ -4,7 +4,9 @@ import typing as T
 from dataclasses import fields
 from multiprocessing import Process
 
+
 import hotdog.core as core
+import os
 import pandas as pd
 import pytest
 import xarray as xr
@@ -14,31 +16,46 @@ from pkg_resources import resource_filename
 _DATA_DIR = pathlib.Path(resource_filename("hotdog", "data"))
 
 
-@pytest.fixture
-def ready_config(tmp_path: pathlib.Path) -> core.Config:
+def prepare_work_space(root_dir: pathlib.Path) -> core.Config:
     # copy the inp file
     inp_name = "Al2O3.inp"
     src_inp = _DATA_DIR.joinpath(inp_name)
-    tgt_inp = tmp_path.joinpath(inp_name)
+    tgt_inp = root_dir.joinpath(inp_name)
     shutil.copy(str(src_inp), str(tgt_inp))
     # assign csv path
-    tgt_csv = tmp_path.joinpath("hotdog_data.csv")
+    tgt_csv = root_dir.joinpath("hotdog_data.csv")
     # create a directory for inputs
-    watch_path = tmp_path.joinpath("inputs")
-    watch_path.mkdir()
+    watch_path = root_dir.joinpath("inputs")
+    watch_path.mkdir(exist_ok=True)
     # ceate fake topas exe
-    tc_path = tmp_path.joinpath("tc.exe")
+    tc_path = root_dir.joinpath("tc.exe")
     tc_path.touch()
     # write config
     config_file = _DATA_DIR.joinpath("example_config.yaml")
     config = core.Config.from_file(str(config_file))
     config.processor.inp_path = str(tgt_inp)
-    config.processor.working_dir = str(tmp_path)
+    config.processor.working_dir = str(root_dir)
     config.observer.watch_path = str(watch_path)
     config.processor.prev_csv = str(tgt_csv)
     config.processor.tc_path = str(tc_path)
     config.processor.is_test = True
+    save_config_file(config)
     return config
+
+def save_config_file(config: core.Config) -> str:
+    yaml_file = pathlib.Path(config.processor.working_dir).joinpath("config.yaml")
+    config.to_yaml(str(yaml_file))
+    return str(yaml_file)
+
+
+@pytest.fixture
+def ready_config(tmp_path: pathlib.Path) -> core.Config:
+    return prepare_work_space(tmp_path)
+
+
+@pytest.fixture
+def ready_config_file(ready_config) -> str:
+    return save_config_file(ready_config)
 
 
 def copy_xy_files(config: core.Config):
@@ -47,12 +64,6 @@ def copy_xy_files(config: core.Config):
         tgt_xy = pathlib.Path(config.observer.watch_path).joinpath(src_xy.name)
         shutil.copy(str(src_xy), str(tgt_xy))
     return
-
-
-def save_config_file(config: core.Config) -> str:
-    yaml_file = pathlib.Path(config.processor.working_dir).joinpath("config.yaml")
-    config.to_yaml(str(yaml_file))
-    return str(yaml_file)
 
 
 def get_expected_data_keys(config: core.Config) -> T.Set[str]:
@@ -71,7 +82,9 @@ def get_expected_columns(config: core.Config) -> T.Set[str]:
 
 
 def get_output_dataframe(config: core.Config) -> pd.DataFrame:
-    df: pd.DataFrame = pd.read_csv(config.processor.prev_csv, index_col=0)
+    prev_csv = pathlib.Path(config.processor.prev_csv)
+    assert prev_csv.is_file()
+    df: pd.DataFrame = pd.read_csv(str(prev_csv), index_col=0)
     return df
 
 
@@ -107,9 +120,17 @@ def test_Processor(ready_config: core.Config):
     check_dataframe_correctness(config)
 
 
-def test_run_hotdogbatch(ready_config: core.Config):
-    config = ready_config
+def test_run_hotdogbatch(ready_config_file: str):
+    config_file = ready_config_file
+    config = core.Config.from_file(config_file)
     copy_xy_files(config)
-    config_file = save_config_file(config)
     core.run_hotdogbatch(config_file)
     check_dataframe_correctness(config)
+
+
+def test_start_hotdog_server(ready_config_file: str):
+    core.Server.from_file(ready_config_file)
+
+
+def test_start_vis_server(ready_config_file: str):
+    core.VisServer.from_file(ready_config_file)
