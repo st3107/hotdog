@@ -22,8 +22,7 @@ jobs:
 
       - name: install the package
         run: |
-          chmod +x "${GITHUB_WORKSPACE}/install.sh"
-          "${GITHUB_WORKSPACE}/install.sh" test developer
+          "mode='developer' bash ${GITHUB_WORKSPACE}/install.sh"
 
       - name: run the tests and check for test coverage
         run: coverage run -m pytest
