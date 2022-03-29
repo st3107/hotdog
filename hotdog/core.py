@@ -250,6 +250,7 @@ class Server(Observer):
             yaml.safe_dump(dct, f)
         return
 
+
 class Processor(LiveDispatcher):
     """Process the data file and publish the results in an event stream."""
 
@@ -642,6 +643,7 @@ class VisServer(RemoteDispatcher):
     def start(self):
         self.print("Start visualization server listening to '{}'.".format(self.config.proxy.out_port))
         return super().start()
+
 
 @make_class_safe(logger=logger)
 class FitPlot(QtAwareCallback):

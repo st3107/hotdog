@@ -2,11 +2,8 @@ import pathlib
 import shutil
 import typing as T
 from dataclasses import fields
-from multiprocessing import Process
-
 
 import hotdog.core as core
-import os
 import pandas as pd
 import pytest
 import xarray as xr
@@ -41,6 +38,7 @@ def prepare_work_space(root_dir: pathlib.Path) -> core.Config:
     config.processor.is_test = True
     save_config_file(config)
     return config
+
 
 def save_config_file(config: core.Config) -> str:
     yaml_file = pathlib.Path(config.processor.working_dir).joinpath("config.yaml")
