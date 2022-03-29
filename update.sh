@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -e
 env="${env:-hotdog}"
 mode="${mode:-user}"
 
