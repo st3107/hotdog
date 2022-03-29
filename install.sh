@@ -13,9 +13,9 @@ conda install -n "$env" -c conda-forge --file requirements.txt --yes
 if [ "$mode" == "developer" ]
 then
     conda install -n "$env" -c conda-forge --file requirements-dev.txt --freeze-installed --yes
-    conda run -n "$env" --live-stream python -m pip install -e .
+    conda run -n "$env" --live-stream python -m pip install -e . --no-deps
 else
-    conda run -n "$env" --live-stream python -m pip install .
+    conda run -n "$env" --live-stream python -m pip install . --no-deps
 fi
 
 echo "Finish installation."

@@ -19,9 +19,9 @@ fi
 echo "Update the packge in '$env' environment."
 if [ "$mode" == "developer" ]
 then
-    conda run -n "$env" --live-stream python -m pip install -e .
+    conda run -n "$env" --live-stream python -m pip install -e . --no-deps
 else
-    conda run -n "$env" --live-stream python -m pip install .
+    conda run -n "$env" --live-stream python -m pip install . --no-deps
 fi
 
 echo "Finish update."
