@@ -250,7 +250,6 @@ class Server(Observer):
             yaml.safe_dump(dct, f)
         return
 
-
 class Processor(LiveDispatcher):
     """Process the data file and publish the results in an event stream."""
 
@@ -306,7 +305,9 @@ class Processor(LiveDispatcher):
         return pd.read_csv(str(csv_path), error_bad_lines=False)
 
     def _save_data(self, data: AnyData, metadata: MetaData) -> None:
-        new_df = pd.DataFrame(dict(**data, **metadata))
+        ignored = {"tth", "I", "Icalc", "Idiff"}
+        new_data = {k: v for k, v in data.items() if k not in ignored}
+        new_df = pd.Series(dict(**new_data, **metadata)).to_frame().T
         csv_path = pathlib.Path(self.config.prev_csv)
         if self.count == 1 and not csv_path.is_file():
             new_df.to_csv(str(csv_path), mode='w', header=True)
@@ -638,6 +639,9 @@ class VisServer(RemoteDispatcher):
             yaml.safe_dump(dct, f)
         return
 
+    def start(self):
+        self.print("Start visualization server listening to '{}'.".format(self.config.proxy.out_port))
+        return super().start()
 
 @make_class_safe(logger=logger)
 class FitPlot(QtAwareCallback):
@@ -917,6 +921,17 @@ class MyProxy(Proxy):
         with pathlib.Path(config_file).open("w") as f:
             yaml.safe_dump(dct, f)
         return
+
+    @staticmethod
+    def print(message: str):
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+        text = "[{}] {}".format(dt_string, message)
+        return print(text)
+
+    def start(self):
+        self.print("Start proxy from '{}' to '{}'.".format(self.config.in_port, self.config.out_port))
+        return super().start()
 
 
 def run_hotdog(config_file: str) -> None:
