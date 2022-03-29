@@ -17,7 +17,7 @@ jobs:
           auto-activate-base: false
 
       - name: install the package
-        run: mode="developer" bash "${GITHUB_WORKSPACE}/install.sh"
+        run: mode="developer" env="hotdog" bash "${GITHUB_WORKSPACE}/install.sh"
 
       - name: run the tests and check for test coverage
         run: coverage run -m pytest
