@@ -200,7 +200,7 @@ class Handler(PatternMatchingEventHandler):
 
     def on_any_event(self, event):
         if isinstance(event, FileCreatedEvent):
-            self.processor._process_a_file(str(event.src_path))
+            self.processor.process_a_file(str(event.src_path))
 
 
 class Server(Observer):
@@ -291,6 +291,7 @@ class Processor(LiveDispatcher):
     def _get_file_names(self) -> typing.List[pathlib.Path]:
         _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
         filenames = list(it.chain(*(_glob(p) for p in self.obs_config.patterns)))
+        filenames = sorted(filenames, key=lambda f: f.stem)
         if not filenames:
             raise ProcessorError(
                 "Cannot find any files matched to the patterns in '{}'.".format(self.input_dir.absolute())
@@ -314,7 +315,7 @@ class Processor(LiveDispatcher):
         self.prev_df = pd.concat((self.prev_df, new_df), ignore_index=True, copy=False)
         return
 
-    def _process_a_file(self, filename: str) -> None:
+    def process_a_file(self, filename: str) -> None:
         """Process the XRD data file and output the documents of the results.
 
         The fitted data file and result csv file will be generated in the process.
@@ -355,7 +356,7 @@ class Processor(LiveDispatcher):
     def _process_many_files(self, filenames: typing.Iterable[str]) -> None:
         count = 0
         for f in filenames:
-            self._process_a_file(f)
+            self.process_a_file(f)
             count += 1
         if count > 0:
             self.stop_and_reset()
