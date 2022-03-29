@@ -5,10 +5,27 @@ env="${env:-hotdog}"
 mode="${mode:-user}"
 pyversion="${pyversion:-3.9}"
 
-echo "Start creating conda environment '$env' with python '$pyversion'."
-conda create -n "$env" python="$pyversion" --yes
+if [ "$mode" == "user" ]
+then
+    echo "Download latest sotware."
+    git stash
+    git checkout main
+    git pull origin main
+fi
 
-echo "Start installing in the '$mode' mode."
+find_conda_env(){
+    conda env list | grep "${@}" >/dev/null 2>/dev/null
+}
+
+if find_conda_env "^$env\s";
+then
+    echo "Find the '$env' environment."
+else
+    echo "Start creating conda '$env' environment with python '$pyversion'."
+    conda create -n "$env" python="$pyversion" --yes
+fi
+
+echo "Start installing in the '$env' environment with '$mode' mode."
 conda install -n "$env" -c conda-forge --file requirements.txt --yes
 if [ "$mode" == "developer" ]
 then
