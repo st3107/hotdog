@@ -295,21 +295,17 @@ class Processor(LiveDispatcher):
         csv_path = pathlib.Path(self.config.prev_csv)
         if not csv_path.is_file():
             df = pd.DataFrame()
-            df.to_csv(str(csv_path))
             return df
         return pd.read_csv(str(csv_path), error_bad_lines=False)
 
     def _save_data(self, data: dict) -> None:
         new_df = pd.DataFrame(data)
-        new_df.to_csv(
-            self.config.prev_csv,
-            mode='a'
-        )
-        self.prev_df = pd.concat(
-            (self.prev_df, new_df),
-            ignore_index=True,
-            copy=False
-        )
+        csv_path = pathlib.Path(self.config.prev_csv)
+        if self.count == 1 and not csv_path.is_file():
+            new_df.to_csv(str(csv_path), mode='w', header=True)
+        else:
+            new_df.to_csv(str(csv_path), mode='a', header=False)
+        self.prev_df = pd.concat((self.prev_df, new_df), ignore_index=True, copy=False)
         return
 
     def _process_a_file(self, filename: str) -> None:
@@ -339,7 +335,7 @@ class Processor(LiveDispatcher):
         # save the data in file and memory
         self._save_data(data)
         # emit start if this is the first file
-        if self.count <= 1:
+        if self.count == 1:
             self._emit_start()
             self._emit_descriptor()
         # emit event data
@@ -368,9 +364,10 @@ class Processor(LiveDispatcher):
     def _run_topas(self, filename: str) -> FitResult:
         # if it is a test, return a fake result
         if self.config.is_test:
-            a_zero = np.array([0.])
-            a_one = np.array([1.])
-            return FitResult(0.0, 1.0, a_zero, a_one, a_one, a_zero)
+            a_range = np.array([0., 1.])
+            a_zero = np.array([0., 0.])
+            a_one = np.array([1., 1.])
+            return FitResult(0.0, 1.0, a_range, a_one, a_one, a_zero)
         wd = self.saving_dir
         tc_path = self.tc_path
         # get all file paths
@@ -971,6 +968,3 @@ def run_hotdogbatch(config_file: str) -> None:
 def hotdogbatch() -> None:
     fire.Fire(run_hotdogbatch)
     return
-
-
-#TODO: a function to start two servers in two thread at once
