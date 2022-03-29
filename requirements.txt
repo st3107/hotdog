@@ -1,5 +1,4 @@
 # List required packages in this file, one per line.
-python=3.9
 pip
 dacite
 bluesky

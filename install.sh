@@ -2,9 +2,10 @@
 
 env="${env:-hotdog}"
 mode="${mode:-user}"
+pyversion="${pyversion:-3.9}"
 
-echo "Start creating conda environment '$env'."
-conda create -n "$env" --yes
+echo "Start creating conda environment '$env' with python '$pyversion'."
+conda create -n "$env" python="$pyversion" --yes
 
 echo "Start installing in the '$mode' mode."
 conda install -n "$env" -c conda-forge --file requirements.txt --yes
