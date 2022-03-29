@@ -13,19 +13,16 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          activate-environment: hotdog
           auto-activate-base: false
 
       - name: install the package
         run: mode="developer" env="hotdog" bash "${GITHUB_WORKSPACE}/install.sh"
 
-      - name: run the tests and check for test coverage
-        run: coverage run -m pytest
-
-      - name: generate the test coverage report and upload it to codecov
+      - name: run the test
         run: |
-          coverage report -m
-          codecov
+          conda run -n "hotdog" --live-stream coverage run -m pytest
+          conda run -n "hotdog" --live-stream coverage report -m
+          conda run -n "hotdog" --live-stream codecov
           
       - name: check the code style
-        run: flake8
+        run: conda run -n "hotdog" --live-stream codecov flake8
