@@ -25,4 +25,4 @@ jobs:
           conda run -n "hotdog" --live-stream codecov
           
       - name: check the code style
-        run: conda run -n "hotdog" --live-stream codecov flake8
+        run: conda run -n "hotdog" --live-stream flake8
