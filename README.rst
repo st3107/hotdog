@@ -6,6 +6,8 @@ hotdog
     :target: https://github.com/st3107/hotdog/actions/workflows/test.yml
 .. image:: https://github.com/st3107/hotdog/actions/workflows/docs.yml/badge.svg
     :target: https://github.com/st3107/hotdog/actions/workflows/docs.yml
+.. image:: https://codecov.io/gh/st3107/hotdog/branch/main/graph/badge.svg?token=3UMZFQ46UD
+    :target: https://codecov.io/gh/st3107/hotdog
 
 
 A python package to calibrate the temperature distribution in the floating zone furnace.
