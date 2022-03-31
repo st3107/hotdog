@@ -64,11 +64,17 @@ def copy_xy_files(config: core.Config):
     return
 
 
+def copy_csv_file(config: core.Config):
+    src_csv = _DATA_DIR.joinpath("hotdog_data.csv")
+    shutil.copy(str(src_csv), config.processor.prev_csv)
+    return
+
+
 def get_expected_data_keys(config: core.Config) -> T.Set[str]:
     extracted_keys = set(config.processor.data_keys)
     calib_result_keys = {f.name for f in fields(core.CalibResult)}
     fit_result_keys = {f.name for f in fields(core.FitResult)}
-    expect_data_keys = extracted_keys.union(calib_result_keys).difference(fit_result_keys)
+    expect_data_keys = extracted_keys.union(calib_result_keys).union(fit_result_keys)
     return expect_data_keys
 
 
@@ -82,7 +88,7 @@ def get_expected_columns(config: core.Config) -> T.Set[str]:
 def get_output_dataframe(config: core.Config) -> pd.DataFrame:
     prev_csv = pathlib.Path(config.processor.prev_csv)
     assert prev_csv.is_file()
-    df: pd.DataFrame = pd.read_csv(str(prev_csv), index_col=0)
+    df: pd.DataFrame = pd.read_csv(str(prev_csv))
     return df
 
 
@@ -128,6 +134,17 @@ def test_process_unrecorded_files(ready_config: core.Config):
     processor.stop_and_reset()
     check_database_correctness(config, db)
     check_dataframe_correctness(config)
+
+
+def test_replay_record(ready_config: core.Config):
+    config = ready_config
+    copy_csv_file(config)
+    processor = core.Processor(config)
+    db = Broker.named("temp").v2
+    processor.subscribe(db.v1.insert)
+    processor.replay_records()
+    processor.stop_and_reset()
+    check_database_correctness(config, db)
 
 
 def test_run_hotdogbatch(ready_config_file: str):

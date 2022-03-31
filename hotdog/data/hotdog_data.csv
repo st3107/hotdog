@@ -1,0 +1,4 @@
+x,y,Rwp,Vol,alpha,realVol,T,filename,time
+55.62,64.0,0.0,1.0,1.0,1.0,293.15,"001Al2O3_009_double_grid_Ar_100p_20190822-210853_Grid_X_55,62000_mm_Grid_Y_64,00000_mm_a428d7_0001_dark_corrected_img",2019-08-22 21:08:53
+56.169,64.0,0.0,1.0,1.0,1.0,293.15,"002Al2O3_009_double_grid_Ar_100p_20190822-210855_Grid_X_56,16900_mm_Grid_Y_64,00000_mm_a428d7_0002_dark_corrected_img",2019-08-22 21:08:55
+56.169,64.0,0.0,1.0,1.0,1.0,293.150000000896,"003Al2O3_009_double_grid_Ar_100p_20190822-210901_Grid_X_56,16900_mm_Grid_Y_64,00000_mm_a428d7_0002_dark_corrected_img",2019-08-22 21:09:01
