@@ -13,17 +13,8 @@ then
     git pull origin main
 fi
 
-find_conda_env(){
-    conda env list | grep "${@}" >/dev/null 2>/dev/null
-}
-
-if find_conda_env "^$env\s";
-then
-    echo "Find the '$env' environment."
-else
-    echo "Start creating conda '$env' environment with python '$pyversion'."
-    conda create -n "$env" python="$pyversion" --yes
-fi
+echo "Start creating conda '$env' environment with python '$pyversion'."
+conda create -n "$env" python="$pyversion" --yes
 
 echo "Start installing in the '$env' environment with '$mode' mode."
 conda install -n "$env" -c conda-forge --file requirements.txt --yes
