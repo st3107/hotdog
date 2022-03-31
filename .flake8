@@ -7,4 +7,5 @@ exclude =
     versioneer.py,
     hotdog/_version.py,
     docs/source/conf.py
+    scripts
 max-line-length = 115
