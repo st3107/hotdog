@@ -22,6 +22,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Logic behind the hotdog" href="logic.html" />
     <link rel="prev" title="Installation" href="installation.html" /> 
 </head>
 
@@ -51,6 +52,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#how-to-use-it-after-the-collection">How to use it after the collection?</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="logic.html">Logic behind the hotdog</a></li>
 </ul>
 
         </div>
@@ -103,21 +105,22 @@ calibration is done.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">activate</span> <span class="n">hotdog</span>
 </pre></div>
 </div>
-<p>In the first terminal, start the data processing server (here, we use “example_config.yaml” as the config file.):</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdog</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
-</pre></div>
-</div>
-<p>In the second terminal, start the proxy server:</p>
+<p>In the first terminal, start the proxy server:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdogproxy</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
 </pre></div>
 </div>
-<p>In the third terminal, start the data visualization server:</p>
+<p>In the second terminal, start the data visualization server:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdogvis</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
 </pre></div>
 </div>
-<p>The data processing and saving are done by the first server.The second and the third servers are for the
+<p>In the third terminal, start the data processing server (here, we use “example_config.yaml” as the config file.):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hotdog</span> <span class="n">example_config</span><span class="o">.</span><span class="n">yaml</span>
+</pre></div>
+</div>
+<p>The data processing and saving are done by the first server. The second and the third servers are for the
 visualization.</p>
 <p>If you didn’t see any error messages, the servers have been successfully started.</p>
+<p>To know more about what the server does, please read the logic section.</p>
 </section>
 <section id="how-to-use-it-after-the-collection">
 <h2>How to use it after the collection?<a class="headerlink" href="#how-to-use-it-after-the-collection" title="Permalink to this headline">¶</a></h2>
@@ -147,6 +150,7 @@ the same configuration file as the hotdog.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="logic.html" class="btn btn-neutral float-right" title="Logic behind the hotdog" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

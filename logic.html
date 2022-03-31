@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logic behind the hotdog &mdash; hotdog 0.0.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/plot_directive.css" type="text/css" />
+      <link rel="stylesheet" href="_static/copybutton.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/clipboard.min.js"></script>
+        <script src="_static/copybutton.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Usage" href="usage.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> hotdog
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Logic behind the hotdog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-happened-at-the-start-of-the-server">What happened at the start of the server?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-happened-when-a-new-file-is-added">What happened when a new file is added?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-happend-at-the-end-of-the-server">What happend at the end of the server?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-is-one-file-processed">How is one file processed?</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">hotdog</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Logic behind the hotdog</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/logic.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="logic-behind-the-hotdog">
+<h1>Logic behind the hotdog<a class="headerlink" href="#logic-behind-the-hotdog" title="Permalink to this headline">¶</a></h1>
+<section id="what-happened-at-the-start-of-the-server">
+<h2>What happened at the start of the server?<a class="headerlink" href="#what-happened-at-the-start-of-the-server" title="Permalink to this headline">¶</a></h2>
+<p>The server will first read the <cite>prev_csv</cite> and send out the data in it to the proxy.
+Then, it will find all the data files in the <cite>watch_path</cite> and check if the file is recorded in the <cite>prev_csv</cite>.
+If the file is recorded, it won’t do anything to it.
+If not, it will process the data in the file and send the result to the proxy.</p>
+</section>
+<section id="what-happened-when-a-new-file-is-added">
+<h2>What happened when a new file is added?<a class="headerlink" href="#what-happened-when-a-new-file-is-added" title="Permalink to this headline">¶</a></h2>
+<p>When a new file is added to the <cite>watch_path</cite>,
+the server will first check if this file is a file that follows the <cite>patterns</cite> and it is not in the <cite>excluded_patterns</cite>.
+If the condition holds, this file is considered as a data file and the server will process it.
+If not, the server will ignore it.
+If there is no new file added, the server will do nothing.</p>
+</section>
+<section id="what-happend-at-the-end-of-the-server">
+<h2>What happend at the end of the server?<a class="headerlink" href="#what-happend-at-the-end-of-the-server" title="Permalink to this headline">¶</a></h2>
+<p>When the server is terminated by the <cite>CTRL + C</cite>,
+it will send out send out the message to proxy.
+The proxy will transfer this message to the listeners to let them know that it is the time to finalize their tasks.</p>
+</section>
+<section id="how-is-one-file-processed">
+<h2>How is one file processed?<a class="headerlink" href="#how-is-one-file-processed" title="Permalink to this headline">¶</a></h2>
+<p>First, the metadata like <cite>time</cite> and <cite>filename</cite> and useful scalar data specified in the <cite>data_keys</cite> will be parsed using the file name.</p>
+<p>Then, the server will write a <cite>.inp</cite> file using the template specified by <cite>inp_path</cite>.
+After that, the server will fork a subprocess to run topas using the INP file.
+The topas will output the fitted result <cite>.res</cite>, fitted data arrays <cite>.fit</cite>, output file <cite>.out</cite>.</p>
+<p>There are three cases how server responses to the topas output:</p>
+<p><strong>Case 1</strong> This is the first file that the server received.</p>
+<p>The server will think that this is a room temperature measurement at the center of the sample.
+The server will just record the topas output and room temperature in the cache.</p>
+<p><strong>Case 2</strong> This is the not the first file but it is the first time that the server saw the “position” recorded in the file name.</p>
+<p>The server will consider it as the room temperature measurement but not necessay at the center of the sample.
+The server will just record the topas output and calculate the correction parameter for the cell volume and record these data with the room temperature in the cache.</p>
+<p><strong>Case 3</strong> The server saw the “position” recorded in the file name before.</p>
+<p>The server will think that it is a measurement not at room temperature and the temperature of this point needs to be calibrated.
+The server will read the data that topas outputs and calibrate the temperature using it and former data recorded in the cache.
+After it is done, the server will record the new processed data in the cache.</p>
+<p>After the server responds to the topas output, it summary the data it processed and prepares sending them to the proxy.</p>
+<p>Before sending them, the server will check the counter inside to know if this is the first time it sends out data to the proxy.</p>
+<p><strong>Case 1</strong></p>
+<p>If it is the first time, the server will first send out the message that a new experiment has started and what data is expected to be sent out.</p>
+<p><strong>Case 2</strong></p>
+<p>Then it will send out the message containing the data.
+If it is not the first time, the server will only send out the messasge containing the data.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="usage.html" class="btn btn-neutral float-left" title="Usage" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Songsheng Tao.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

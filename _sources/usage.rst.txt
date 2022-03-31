@@ -36,23 +36,26 @@ Open three bash terminals and conda activate the environment in each of them (he
 
     conda activate hotdog
 
-In the first terminal, start the data processing server (here, we use "example_config.yaml" as the config file.)::
-
-    hotdog example_config.yaml
-
-In the second terminal, start the proxy server::
+In the first terminal, start the proxy server::
 
     hotdogproxy example_config.yaml
 
-In the third terminal, start the data visualization server::
+In the second terminal, start the data visualization server::
 
     hotdogvis example_config.yaml
 
-The data processing and saving are done by the first server.The second and the third servers are for the
+
+In the third terminal, start the data processing server (here, we use "example_config.yaml" as the config file.)::
+
+    hotdog example_config.yaml
+
+
+The data processing and saving are done by the first server. The second and the third servers are for the
 visualization.
 
 If you didn't see any error messages, the servers have been successfully started.
 
+To know more about what the server does, please read the logic section.
 
 How to use it after the collection?
 -----------------------------------

@@ -11,3 +11,4 @@ hotdog Documentation
 
    installation
    usage
+   logic
