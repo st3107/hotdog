@@ -242,6 +242,7 @@ class Server(Observer):
         self.join()
 
     def start(self):
+        self.processor.replay_records()
         self.processor.process_unrecorded_files()
         return super().start()
 
@@ -298,7 +299,7 @@ class Processor(LiveDispatcher):
         if not csv_path.is_file():
             df = pd.DataFrame()
             return df
-        return pd.read_csv(str(csv_path), error_bad_lines=False)
+        return pd.read_csv(str(csv_path))
 
     def _save_data(self, data: AnyData, metadata: MetaData) -> None:
         ignored = {"tth", "I", "Icalc", "Idiff"}
@@ -306,9 +307,9 @@ class Processor(LiveDispatcher):
         new_df = pd.Series(dict(**new_data, **metadata)).to_frame().T
         csv_path = pathlib.Path(self.config.prev_csv)
         if self.count == 1 and not csv_path.is_file():
-            new_df.to_csv(str(csv_path), mode='w', header=True)
+            new_df.to_csv(str(csv_path), mode='w', header=True, index=False)
         else:
-            new_df.to_csv(str(csv_path), mode='a', header=False)
+            new_df.to_csv(str(csv_path), mode='a', header=False, index=False)
         self.prev_df = pd.concat((self.prev_df, new_df), ignore_index=True, copy=False)
         return
 
@@ -385,7 +386,8 @@ class Processor(LiveDispatcher):
         return
 
     def emit(self, name, doc):
-        doc["time"] = self.original_time
+        if self.original_time is not None:
+            doc["time"] = self.original_time
         return super(Processor, self).emit(name, doc)
 
     def _run_topas(self, filename: str) -> FitResult:
@@ -622,7 +624,32 @@ class Processor(LiveDispatcher):
             dct = yaml.safe_load(f)
         return cls.from_dict(dct)
 
-    # TODO: a method to send out event of processed data
+    def _process_a_row(self, row: typing.NamedTuple) -> None:
+        self.count += 1
+        data = dict(row._asdict())
+        if "filename" in data:
+            data.pop("filename")
+        if "time" in data:
+            t = data.pop("time")
+            dt = pd.to_datetime(t)
+            self.original_time = time.mktime(dt.timetuple())
+        data["tth"] = np.array([0.])
+        data["I"] = np.array([0.])
+        data["Icalc"] = np.array([0.])
+        data["Idiff"] = np.array([0.])
+        if self.count == 1:
+            self._emit_start()
+            self._emit_descriptor()
+        self.process_event({"data": data, "descriptor": self.desc_uid})
+        return
+
+    def replay_records(self) -> None:
+        df = self.prev_df
+        if df.empty:
+            return
+        for row in df.itertuples():
+            self._process_a_row(row)
+        return
 
 
 class VisServer(RemoteDispatcher):
@@ -1030,6 +1057,3 @@ def run_hotdogbatch(config_file: str) -> None:
 def hotdogbatch() -> None:
     fire.Fire(run_hotdogbatch)
     return
-
-
-# TODO: a CLI to send the message of processed data
