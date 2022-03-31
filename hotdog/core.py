@@ -286,7 +286,7 @@ class Processor(LiveDispatcher):
     def _get_file_names(self) -> typing.List[pathlib.Path]:
         _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
         filenames = list(it.chain(*(_glob(p) for p in self.obs_config.patterns)))
-        filenames = sorted(filenames, key=lambda f: f.stem)
+        filenames = sorted(filenames, key=self._get_time_str)
         if not filenames:
             raise ProcessorError(
                 "Cannot find any files matched to the patterns in '{}'.".format(self.input_dir.absolute())
@@ -355,8 +355,6 @@ class Processor(LiveDispatcher):
             self.process_a_file(f)
         return
 
-    # TODO: deprecate the progress bar
-    # TODO: explicitly issue stop
     def process_files_in_dir(self) -> None:
         filenames = self._get_file_names()
         filenames = tqdm.tqdm(filenames, disable=(not self.config.progress_bar))
@@ -530,6 +528,13 @@ class Processor(LiveDispatcher):
         doc["uid"] = uid
         doc["hints"] = {'dimensions': [([dk], 'primary') for dk in dks]}
         return super().start(doc)
+
+    def _get_time_str(self, filename: str):
+        xy_file_fmt = self.config.xy_file_fmt
+        # parse file name
+        xy_file = pathlib.Path(filename)
+        dct = isu.reverse_format(xy_file_fmt, xy_file.name)
+        return dct["time"]
 
     def _parse_filename(self, filename: str) -> ParsedData:
         xy_file_fmt = self.config.xy_file_fmt
