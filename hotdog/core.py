@@ -221,7 +221,7 @@ class Server(Observer):
         self.processor.subscribe(self.publisher)
         self.schedule(self.handler, path=config.observer.watch_path, recursive=config.observer.recursive)
         self.config.validate()
-    
+
     def run_until_timeout(self):
         timeout = self.config.observer.timeout
         if timeout is None:
