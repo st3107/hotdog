@@ -283,14 +283,6 @@ class Processor(LiveDispatcher):
         self._create_dir()
         self._print("Processor is ready. The data will be output in {}.".format(str(self.working_dir)))
 
-    # TODO: deprecate the progress bar
-    # TODO: explicitly issue stop
-    def process_files_in_dir(self) -> None:
-        filenames = self._get_file_names()
-        filenames = tqdm.tqdm(filenames, disable=(not self.config.progress_bar))
-        self._process_many_files(filenames)
-        return
-
     def _get_file_names(self) -> typing.List[pathlib.Path]:
         _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
         filenames = list(it.chain(*(_glob(p) for p in self.obs_config.patterns)))
@@ -366,6 +358,14 @@ class Processor(LiveDispatcher):
             count += 1
         if count > 0:
             self.stop_and_reset()
+        return
+
+    # TODO: deprecate the progress bar
+    # TODO: explicitly issue stop
+    def process_files_in_dir(self) -> None:
+        filenames = self._get_file_names()
+        filenames = tqdm.tqdm(filenames, disable=(not self.config.progress_bar))
+        self._process_many_files(filenames)
         return
 
     def emit(self, name, doc):
@@ -564,10 +564,14 @@ class Processor(LiveDispatcher):
         return
 
     def stop_and_reset(self) -> None:
+        if self.count == 0:
+            self.stopped = True
+            return
         uid = bus.new_uid()
-        self.stopped = True
         self.count = 0
-        return super().stop({"uid": uid, "exit_status": "success"})
+        super().stop({"uid": uid, "exit_status": "success"})
+        self.stopped = True
+        return
 
     def _dump_next_config_file(self) -> None:
         # dump the config for the next run
