@@ -215,7 +215,7 @@ class Server(Observer):
         self.processor.subscribe(self.publisher)
         self.schedule(self.handler, path=config.observer.watch_path, recursive=config.observer.recursive)
         self.config.validate()
-
+    
     def run_until_timeout(self):
         timeout = self.config.observer.timeout
         if timeout is None:
@@ -225,11 +225,11 @@ class Server(Observer):
         try:
             while ((time.time() - t0) <= timeout) and (not self.handler.processor.stopped):
                 time.sleep(1.)
-            self.stop()
         except KeyboardInterrupt:
             # stop the processor
             if not self.handler.processor.stopped:
                 self.handler.processor.stop_and_reset()
+        finally:
             # stop the server
             self.stop()
         self.join()
@@ -254,6 +254,7 @@ class Server(Observer):
 class Processor(LiveDispatcher):
     """Process the data file and publish the results in an event stream."""
 
+    # TODO: process data that has not been recorded
     def __init__(self, config: Config):
         super(Processor, self).__init__()
         self.input_config = config
@@ -282,6 +283,8 @@ class Processor(LiveDispatcher):
         self._create_dir()
         self._print("Processor is ready. The data will be output in {}.".format(str(self.working_dir)))
 
+    # TODO: deprecate the progress bar
+    # TODO: explicitly issue stop
     def process_files_in_dir(self) -> None:
         filenames = self._get_file_names()
         filenames = tqdm.tqdm(filenames, disable=(not self.config.progress_bar))
@@ -355,6 +358,7 @@ class Processor(LiveDispatcher):
         self.input_dir.mkdir(exist_ok=True, parents=True)
         return
 
+    # TODO: don't issue stop
     def _process_many_files(self, filenames: typing.Iterable[str]) -> None:
         count = 0
         for f in filenames:
@@ -590,6 +594,8 @@ class Processor(LiveDispatcher):
         with pathlib.Path(config_file).open("r") as f:
             dct = yaml.safe_load(f)
         return cls.from_dict(dct)
+
+    # TODO: a method to send out event of processed data
 
 
 class VisServer(RemoteDispatcher):
@@ -983,7 +989,7 @@ def hotdogproxy() -> None:
     fire.Fire(run_hotdogproxy)
     return
 
-
+# TODO: start a server and use the processor in the server
 def run_hotdogbatch(config_file: str) -> None:
     processor = Processor.from_file(config_file)
     processor.config.validate()
@@ -995,3 +1001,6 @@ def run_hotdogbatch(config_file: str) -> None:
 def hotdogbatch() -> None:
     fire.Fire(run_hotdogbatch)
     return
+
+
+# TODO: a CLI to send the message of processed data
