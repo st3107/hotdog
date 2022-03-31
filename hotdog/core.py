@@ -226,6 +226,7 @@ class Server(Observer):
         timeout = self.config.observer.timeout
         if timeout is None:
             timeout = float("inf")
+        # when start process the unrecorded files
         self.start()
         t0 = time.time()
         try:
@@ -239,6 +240,10 @@ class Server(Observer):
             # stop the server
             self.stop()
         self.join()
+
+    def start(self):
+        self.processor.process_unrecorded_files()
+        return super().start()
 
     @classmethod
     def from_dict(cls, config_dct: dict):
@@ -260,7 +265,6 @@ class Server(Observer):
 class Processor(LiveDispatcher):
     """Process the data file and publish the results in an event stream."""
 
-    # TODO: process data that has not been recorded
     def __init__(self, config: Config):
         super(Processor, self).__init__()
         self.input_config = config
@@ -289,16 +293,6 @@ class Processor(LiveDispatcher):
         self._create_dir()
         self._print("Processor is ready. The data will be output in {}.".format(str(self.working_dir)))
 
-    def _get_file_names(self) -> typing.List[pathlib.Path]:
-        _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
-        filenames = list(it.chain(*(_glob(p) for p in self.obs_config.patterns)))
-        filenames = sorted(filenames, key=self._get_time_str)
-        if not filenames:
-            raise ProcessorError(
-                "Cannot find any files matched to the patterns in '{}'.".format(self.input_dir.absolute())
-            )
-        return filenames
-
     def _load_prev_df(self) -> pd.DataFrame:
         csv_path = pathlib.Path(self.config.prev_csv)
         if not csv_path.is_file():
@@ -318,7 +312,7 @@ class Processor(LiveDispatcher):
         self.prev_df = pd.concat((self.prev_df, new_df), ignore_index=True, copy=False)
         return
 
-    def process_a_file(self, filename: str) -> None:
+    def process_a_file(self, filename: typing.Union[str, pathlib.Path]) -> None:
         """Process the XRD data file and output the documents of the results.
 
         The fitted data file and result csv file will be generated in the process.
@@ -356,16 +350,38 @@ class Processor(LiveDispatcher):
         self.input_dir.mkdir(exist_ok=True, parents=True)
         return
 
-    def _process_many_files(self, filenames: typing.Iterable[str]) -> None:
+    def _process_many_files(self, filenames: typing.Iterable[pathlib.Path]) -> None:
         for f in filenames:
             self.process_a_file(f)
         return
+
+    def _get_file_names(self) -> typing.List[pathlib.Path]:
+        _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
+        filenames = it.chain(*(_glob(p) for p in self.obs_config.patterns))
+        filenames = sorted(filenames, key=self._get_time_str)
+        if not filenames:
+            raise ProcessorError(
+                "Cannot find any files matched to the patterns in '{}'.".format(self.input_dir.absolute())
+            )
+        return filenames
+
+    def _get_unrecorded_files(self) -> typing.List[pathlib.Path]:
+        _glob = self.input_dir.rglob if self.obs_config.recursive else self.input_dir.glob
+        filenames = it.chain(*(_glob(p) for p in self.obs_config.patterns))
+        recorded = set(self.prev_df["filename"]) if "filename" in self.prev_df.columns else set()
+        filenames = (f for f in filenames if f.stem not in recorded)
+        return sorted(filenames)
 
     def process_files_in_dir(self) -> None:
         filenames = self._get_file_names()
         filenames = tqdm.tqdm(filenames, disable=(not self.config.progress_bar))
         self._process_many_files(filenames)
         self.stop_and_reset()
+        return
+
+    def process_unrecorded_files(self) -> None:
+        filenames = self._get_unrecorded_files()
+        self._process_many_files(filenames)
         return
 
     def emit(self, name, doc):
