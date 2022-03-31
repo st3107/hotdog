@@ -203,6 +203,12 @@ class Handler(PatternMatchingEventHandler):
             self.processor.process_a_file(str(event.src_path))
 
 
+class MyPublisher(Publisher):
+
+    def __init__(self, config: ProxyConfig):
+        super().__init__((config.host, config.in_port))
+
+
 class Server(Observer):
     """Monitor the directory and let Processor process the newly created files."""
 
@@ -211,7 +217,7 @@ class Server(Observer):
         self.config = config
         self.handler = Handler(config)
         self.processor = self.handler.processor
-        self.publisher = Publisher((config.proxy.host, config.proxy.in_port))
+        self.publisher = MyPublisher(config.proxy)
         self.processor.subscribe(self.publisher)
         self.schedule(self.handler, path=config.observer.watch_path, recursive=config.observer.recursive)
         self.config.validate()
@@ -994,11 +1000,13 @@ def hotdogproxy() -> None:
     fire.Fire(run_hotdogproxy)
     return
 
-# TODO: start a server and use the processor in the server
+
 def run_hotdogbatch(config_file: str) -> None:
-    processor = Processor.from_file(config_file)
-    processor.config.validate()
-    processor.obs_config.validate()
+    config = Config.from_file(config_file)
+    config.validate()
+    publisher = MyPublisher(config.proxy)
+    processor = Processor(config)
+    processor.subscribe(publisher)
     processor.process_files_in_dir()
     return
 
