@@ -33,6 +33,6 @@ If you have already installed the package but didn't get the latest version, ple
 
     cd hotdog
     git pull origin main
-    bash install.sh
+    bash update.sh
 
 Please change the `hotdog` here to the path to the hotdog folder on your machine.
