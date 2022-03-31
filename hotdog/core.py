@@ -350,14 +350,9 @@ class Processor(LiveDispatcher):
         self.input_dir.mkdir(exist_ok=True, parents=True)
         return
 
-    # TODO: don't issue stop
     def _process_many_files(self, filenames: typing.Iterable[str]) -> None:
-        count = 0
         for f in filenames:
             self.process_a_file(f)
-            count += 1
-        if count > 0:
-            self.stop_and_reset()
         return
 
     # TODO: deprecate the progress bar
@@ -366,6 +361,7 @@ class Processor(LiveDispatcher):
         filenames = self._get_file_names()
         filenames = tqdm.tqdm(filenames, disable=(not self.config.progress_bar))
         self._process_many_files(filenames)
+        self.stop_and_reset()
         return
 
     def emit(self, name, doc):
