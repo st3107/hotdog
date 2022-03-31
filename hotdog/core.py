@@ -233,10 +233,10 @@ class Server(Observer):
             while ((time.time() - t0) <= timeout) and (not self.handler.processor.stopped):
                 time.sleep(1.)
         except KeyboardInterrupt:
-            # stop the processor
-            if not self.handler.processor.stopped:
-                self.handler.processor.stop_and_reset()
+            pass
         finally:
+            # finalizing up the processing
+            self.handler.processor.stop_and_reset()
             # stop the server
             self.stop()
         self.join()
