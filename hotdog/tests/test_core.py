@@ -118,6 +118,18 @@ def test_Processor(ready_config: core.Config):
     check_dataframe_correctness(config)
 
 
+def test_process_unrecorded_files(ready_config: core.Config):
+    config = ready_config
+    copy_xy_files(config)
+    db = Broker.named("temp").v2
+    processor = core.Processor(config)
+    processor.subscribe(db.v1.insert)
+    processor.process_unrecorded_files()
+    processor.stop_and_reset()
+    check_database_correctness(config, db)
+    check_dataframe_correctness(config)
+
+
 def test_run_hotdogbatch(ready_config_file: str):
     config_file = ready_config_file
     config = core.Config.from_file(config_file)
